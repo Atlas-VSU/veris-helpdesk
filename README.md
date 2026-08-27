@@ -1,36 +1,160 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VERIS Helpdesk
 
-## Getting Started
+A ticketing system for VERIS clients (subscribers and students) to submit support requests, track their status, and get replies from VERIS admins — with an admin dashboard for managing incoming tickets.
 
-First, run the development server:
+**Scope note:** This project's feature list was deliberately trimmed to a Core MVP after team lead feedback ("keep it simple," "don't over-engineer"). The bar for v1 is: clients can **submit** a ticket, **track** its status, and **receive replies**. Anything beyond that lives in the Post-MVP backlog — see [Feature Scope](#feature-scope) below.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## Tech Stack
+
+- **Framework**: Next.js (App Router), TypeScript
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **Backend / Database**: Supabase (Postgres, Auth, Storage, Edge Functions)
+- **Email**: Resend (ticket confirmations, OTP codes, admin notifications)
+- **Forms & Validation**: React Hook Form + Zod
+- **Migrations**: Supabase CLI (migration-first workflow — see [Database Setup](#database-setup))
+
+---
+
+## Repository Architecture
+
+```text
+app/                            # Next.js App Router (Routes & Layouts)
+├── page.tsx                    # Landing page
+├── submit/                     # Submit Ticket Form
+├── verify/                     # Email Verification (OTP)
+├── tickets/                    # My Tickets Dashboard
+├── admin/
+│   ├── login/                  # Admin Login
+│   ├── dashboard/               # Admin Dashboard (stats, notifications inbox)
+│   ├── tickets/                 # Tickets Management (search, filter, table)
+│   └── tickets/[id]/            # Admin Ticket Workspace (thread, reply, status)
+├── layout.tsx
+components/                     # Shared UI (form fields, buttons, cards, badges)
+lib/
+├── supabase/                   # Supabase client init (browser + server)
+└── validation/                 # Zod schemas
+supabase/
+├── config.toml
+└── migrations/                 # Versioned schema migrations (source of truth for DB)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Feature Scope
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Core MVP
 
-## Learn More
+**Client-facing**
+- Landing page (nav, hero, submit/track CTAs, expected response time, footer)
+- Submit Ticket Form (name, email, user type, service, subject, description, priority, attachment, consent, CAPTCHA)
+- Email Verification (OTP) to access "My Tickets"
+- Submission Confirmation (ticket number, summary, next actions)
+- My Tickets Dashboard (status filter, search, ticket cards)
 
-To learn more about Next.js, take a look at the following resources:
+**Admin-facing**
+- Admin Login
+- Admin Dashboard (ticket totals, urgent count, status breakdown, recent tickets, **notifications inbox**)
+- Tickets Management (search, status filter, table, pagination)
+- Admin Ticket Workspace (conversation thread, reply-to-client with auto-email, attach file to reply, change status/priority, resolve/request-info actions)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Backend**
+- DB schema (see [Database Setup](#database-setup))
+- Ticket number generator
+- Client OTP verification, Admin login, session timeout, route auth middleware, rate limiting
+- Server-side validation (fields, email format, CAPTCHA, attachment type/size)
+- Create ticket endpoint, attachment upload handler, Supabase Storage integration
+- Ticket confirmation email (Resend)
+- Get/list/filter/search tickets, update status, override priority, change category, close/reopen
+- Client + admin reply endpoints, auto-email on admin reply
+- Notifications: insert on new ticket + client reply, list/mark-read/delete endpoints, admin notification email (Resend)
+- Input validation middleware, centralized error handling
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Post-MVP (explicitly deferred)
 
-## Deploy on Vercel
+Categories CRUD, activity log (table + panel), admin roles / role-based access, admin account management UI, admin password reset (custom-built), admin login lockout (custom-built), internal notes, assign/reassign admin, merge duplicate tickets, sort tickets, status-change email, client profile card, CSV/PDF export, scheduled DB backup, data retention rules automation.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+> Rationale: these were cut to match leads' "submit / track / reply, keep it simple" guidance. Most rely on Supabase's built-in tooling in the meantime (e.g. Supabase Auth covers password reset and login lockout; Supabase itself handles automated backups on paid tiers).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Database Setup
+
+Schema lives in `supabase/migrations/` — **not** the dashboard SQL editor. Always add new schema changes as a migration file first, then push, so migration history stays in sync with the repo (a past feature hit painful schema drift doing it dashboard-first — don't repeat that).
+
+### Tables
+
+| Table | Purpose |
+|---|---|
+| `admins` | Flat admin accounts (no roles for MVP) |
+| `tickets` | Core ticket record — submitter info, issue details, priority, status |
+| `messages` | Conversation thread — client and admin replies |
+| `attachments` | Files linked to a ticket or a specific message |
+| `otp_verifications` | Email OTP codes for the "My Tickets" access flow |
+| `notifications` | Admin dashboard inbox — new ticket / client reply events |
+
+### Enums
+
+`user_type` (subscriber, student) · `ticket_status` (new, open, in_progress, waiting_for_client, resolved, closed) · `priority_level` (low, medium, high, urgent) · `message_sender` (client, admin)
+
+### Workflow
+
+```bash
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase migration new <migration_name>
+# edit the generated .sql file in supabase/migrations/
+supabase db push
+```
+
+### Known open items
+
+- **RLS policies are not yet written.** Tables are open by default — this must be done before any real data touches the project.
+- **Notification insert hooks** still need to be wired into the create-ticket and client-reply endpoints — the `notifications` table exists but nothing writes to it yet.
+- **Attachment restriction**: images (jpg, png) and PDFs only, 10MB max per file — enforced in the upload handler, not the database.
+
+---
+
+## Run Locally
+
+### Prerequisites
+- Node.js (v18+ recommended)
+- npm
+- Supabase CLI (`npm install supabase --save-dev`)
+
+### Setup Steps
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Configure environment variables**:
+   Copy `.env.example` to `.env.local` and fill in:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=
+   RESEND_API_KEY=          # set as a Supabase secret for Edge Functions, not just here
+   ```
+
+3. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+4. **Verify code quality**:
+   ```bash
+   npm run lint
+   npm run build
+   ```
+
+---
+
+## Notes for Contributors
+
+- This is a **team learning project** — first time several of us are working in these roles, PM included. Ask questions early rather than guessing on scope; if something feels like it might be over-engineering, flag it before building.
+- Stick to Core MVP unless a lead has explicitly signed off on adding something (see the notifications inbox in this README's Core MVP section as an example of a feature added *after* lead review, not before).
+- Edge Functions + Database Webhooks + Resend follow the same pattern across features (e.g. ticket confirmation, OTP, admin notifications) — check an existing implementation before building a new one from scratch.
