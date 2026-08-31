@@ -3,8 +3,19 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { AdminRow } from "@/types/database";
+import { loginRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+
+  const { success } = await loginRateLimit.limit(ip);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again later" },
+      { status: 429 },
+    );
+  }
   let email: string;
   let password: string;
 
