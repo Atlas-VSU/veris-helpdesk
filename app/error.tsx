@@ -1,0 +1,1 @@
+// Defines the error boundary UI shown when an unexpected runtime error occurs within that route segment or its children.
