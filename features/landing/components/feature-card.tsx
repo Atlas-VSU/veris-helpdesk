@@ -1,12 +1,5 @@
-import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-
-type FeatureCardProps = {
-  title: string;
-  description: string;
-  icon: LucideIcon;
-  tone: "moss" | "terracotta" | "stone";
-};
+import type { FeatureCardProps } from "../interfaces/feature-card-props";
 
 const toneStyles = {
   moss: {
