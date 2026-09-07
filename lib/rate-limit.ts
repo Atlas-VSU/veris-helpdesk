@@ -26,3 +26,9 @@ export const ticketSubmissionRateLimit = new Ratelimit({
   limiter: Ratelimit.slidingWindow(5, "1 h"),
   prefix: "ratelimit:ticket",
 });
+
+export const otpRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "5 m"),
+  prefix: "ratelimit:otp",
+});
