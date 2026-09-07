@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useState } from "react";
-import { CheckCircle2, ChevronDown, Menu, Send, ShieldCheck, Upload, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock3, Menu, Send, ShieldCheck, Upload } from "lucide-react";
 import type { TicketPriority, UserType } from "@/types/database";
 
 const inputClassName =
@@ -64,7 +64,6 @@ export default function SubmitTicketPage() {
   const [formData, setFormData] = useState<TicketFormData>(initialFormData);
   const [fileName, setFileName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
@@ -88,17 +87,11 @@ export default function SubmitTicketPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (hasSubmitted) {
-      setIsConfirmationOpen(true);
-      return;
-    }
-
     setIsSubmitting(true);
 
     window.setTimeout(() => {
       setIsSubmitting(false);
       setHasSubmitted(true);
-      setIsConfirmationOpen(true);
     }, 400);
   }
 
@@ -106,7 +99,6 @@ export default function SubmitTicketPage() {
     setFormData(initialFormData);
     setFileName("");
     setHasSubmitted(false);
-    setIsConfirmationOpen(false);
   }
 
   return (
@@ -132,6 +124,30 @@ export default function SubmitTicketPage() {
       </header>
 
       <main className="mx-auto max-w-[1440px] px-4 py-10 sm:px-6 md:px-12 md:py-16">
+        {hasSubmitted ? (
+          <div className="mx-auto flex max-w-3xl flex-col items-center rounded-3xl border border-[#DED8CF] bg-[#FEFEFA] p-6 text-center shadow-[0_20px_40px_rgba(93,112,82,0.08)] md:p-16">
+            <div className="mb-6 flex size-24 items-center justify-center rounded-full bg-[#D4E9C4] text-[#45573B] shadow-[0_20px_40px_rgba(93,112,82,0.08)]">
+              <CheckCircle2 aria-hidden="true" className="size-12" />
+            </div>
+            <h1 className="font-serif text-3xl font-semibold text-[#45573B] md:text-4xl">Success! Your ticket has been submitted.</h1>
+            <p className="mt-3 text-lg leading-7 text-[#4A4A40]">A confirmation email has been sent to <span className="font-bold text-[#45573B]">{formData.email}</span>.</p>
+
+            <div className="mt-10 w-full rounded-xl border border-[#C4C8BD]/50 bg-[#F6F4E7] p-6 text-left">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-[#444840]">Issue Summary</h2>
+              <p className="mt-3 text-base leading-6 text-[#2C2C24]">{formData.description}</p>
+              <div className="mt-6 flex items-center gap-3 border-t border-[#C4C8BD]/50 pt-4 text-sm font-bold text-[#5D7052]">
+                <Clock3 aria-hidden="true" className="size-5" />
+                <span>Expected response time: Within 6-12 hours</span>
+              </div>
+            </div>
+
+            <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              <Link className="rounded-lg bg-[#45573B] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#5D7052]" href="/tickets">View Ticket</Link>
+              <button className="rounded-lg bg-[#E5E3D6] px-6 py-3 text-sm font-bold text-[#444840] transition-colors hover:bg-[#C4C8BD]" onClick={handleMakeAnotherTicket} type="button">Submit Another</button>
+              <Link className="rounded-lg border border-[#DED8CF] px-6 py-3 text-sm font-bold text-[#444840] transition-colors hover:border-[#45573B] hover:text-[#45573B]" href="/">Return Home</Link>
+            </div>
+          </div>
+        ) : (
         <div className="mx-auto max-w-3xl">
           <div className="mb-10 text-center">
             <h1 className="font-serif text-4xl font-semibold text-[#45573B] md:text-5xl">Submit a Request</h1>
@@ -212,46 +228,18 @@ export default function SubmitTicketPage() {
                 <div className="space-y-4 pt-2">
                   <div className="flex items-center justify-end gap-6">
                     <button className="text-sm font-bold text-[#78786C] transition-colors hover:text-[#2C2C24]" onClick={handleMakeAnotherTicket} type="button">Cancel</button>
-                    <button className="flex items-center justify-center gap-2 rounded-lg bg-[#45573B] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#5D7052] disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting || hasSubmitted} type="submit">
-                      {isSubmitting ? "Submitting..." : hasSubmitted ? "Ticket Submitted" : "Submit Ticket"}
+                    <button className="flex items-center justify-center gap-2 rounded-lg bg-[#45573B] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#5D7052] disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">
+                      {isSubmitting ? "Submitting..." : "Submit Ticket"}
                       <Send aria-hidden="true" className="size-4" />
                     </button>
                   </div>
-                  {hasSubmitted && (
-                    <div className="w-full rounded-xl border border-[#B8CDA9] bg-[#D4E9C4]/45 p-4 text-[#3A4C30]">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="flex items-center gap-2 text-left text-sm font-bold">
-                          <CheckCircle2 aria-hidden="true" className="size-5" />
-                          This ticket has already been submitted.
-                        </p>
-                        <button className="w-full rounded-lg border border-[#45573B] px-4 py-2 text-sm font-bold text-[#45573B] transition-colors hover:bg-[#45573B] hover:text-white sm:w-auto" onClick={handleMakeAnotherTicket} type="button">
-                          Make a new ticket
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           </form>
         </div>
+        )}
       </main>
-
-      {isConfirmationOpen && (
-        <div aria-labelledby="ticket-submitted-title" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-[#2C2C24]/45 px-4 py-6" role="dialog">
-          <div className="relative w-full max-w-md rounded-2xl border border-[#DED8CF] bg-[#FEFEFA] p-8 text-center shadow-[0_20px_40px_rgba(44,44,36,0.2)]">
-            <button aria-label="Close confirmation" className="absolute right-4 top-4 rounded-full p-2 text-[#78786C] transition hover:bg-[#E6DCCD]/30 hover:text-[#2C2C24]" onClick={() => setIsConfirmationOpen(false)} type="button">
-              <X aria-hidden="true" className="size-5" />
-            </button>
-            <CheckCircle2 aria-hidden="true" className="mx-auto size-14 text-[#45573B]" />
-            <h2 className="mt-5 font-serif text-3xl font-semibold text-[#45573B]" id="ticket-submitted-title">Ticket submitted</h2>
-            <p className="mt-3 text-base leading-6 text-[#4A4A40]">Your support request has been submitted. We&apos;ll get back to you shortly.</p>
-            <button className="mt-7 w-full rounded-lg bg-[#45573B] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#5D7052]" onClick={handleMakeAnotherTicket} type="button">
-              Make another ticket
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
