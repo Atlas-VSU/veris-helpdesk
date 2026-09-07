@@ -1,5 +1,5 @@
 import { CheckCircle2, PencilLine, Search } from "lucide-react";
-import type { FeatureCardProps } from "../interfaces/feature-card-props";
+import type { FeatureCardProps } from "../types/types";
 
 export const features: FeatureCardProps[] = [
   {

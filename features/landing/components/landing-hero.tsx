@@ -21,12 +21,14 @@ export function LandingHero() {
       <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Button
           className="h-12 w-full rounded-full bg-[var(--palette-moss)] px-8 font-sans text-sm font-bold text-white shadow-[0_20px_40px_rgba(93,112,82,0.08)] hover:bg-[var(--palette-charcoal-olive)] sm:w-auto"
+          nativeButton={false}
           render={<Link href="/submit-ticket" />}
         >
           Submit a ticket
         </Button>
         <Button
           className="h-12 w-full rounded-full bg-[var(--palette-terracotta)] px-8 font-sans text-sm font-bold text-white shadow-[0_20px_40px_rgba(193,140,93,0.1)] hover:bg-[var(--palette-charcoal-olive)] sm:w-auto"
+          nativeButton={false}
           render={<Link href="/tickets" />}
         >
           View my tickets
