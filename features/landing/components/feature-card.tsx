@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import type { FeatureCardProps } from "../interfaces/feature-card-props";
+import type { FeatureCardProps } from "../types/types.ts";
 
 const toneStyles = {
   moss: {

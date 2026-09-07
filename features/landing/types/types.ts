@@ -1,5 +1,4 @@
 import type { LucideIcon } from "lucide-react";
-import type { FeatureTone } from "../types/feature-tone";
 
 export type FeatureTone = "moss" | "terracotta" | "stone";
 
