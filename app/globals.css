@@ -1,184 +1,63 @@
-/*
- * Help Desk global styles - Tailwind CSS v4
- * Source: DESIGN_TOKENS.md. Light theme.
- * Import this file once from the application entry point/root layout.
- * Requires Tailwind v4 through its Vite, PostCSS, or CLI integration.
- * Load Nunito and Fraunces separately with your application's font loader.
- * Theme syntax: https://tailwindcss.com/docs/theme
- *
- * Example utilities:
- * bg-background text-foreground font-sans
- * bg-primary text-primary-foreground rounded-control min-h-control
- * bg-status-open text-status-open-foreground rounded-full
- * bg-priority-urgent text-priority-urgent-foreground
- * max-w-layout px-4 md:px-8 shadow-soft duration-fast
- *
- * On moss containers, add class="focus-on-brand" for cream focus outlines.
- * Pair statuses with visible labels and semantic/disabled HTML attributes.
- */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/*
- ---break---
- */
+
 @custom-variant dark (&:is(.dark *));
 
-/* Non-utility tokens and semantic color aliases. */
 :root {
-  /* Exact reference palette */
-  --palette-cream: #FDFCF8;
-  --palette-warm-white: #FEFEFA;
-  --palette-charcoal-olive: #2C2C24;
-  --palette-moss: #5D7052;
-  --palette-off-white: #F3F4F1;
-  --palette-terracotta: #C18C5D;
-  --palette-white: #FFFFFF;
-  --palette-clay: #E6DCCD;
-  --palette-dark-olive: #4A4A40;
-  --palette-sand: #F0EBE5;
-  --palette-gray-olive: #78786C;
-  --palette-stone: #DED8CF;
-  --palette-coral: #A85448;
+  /* --- 1. Light Mode (Organic Theme) Core Colors --- */
+  --background: #fdfcf8;
+  --foreground: #2c2c24;
+  --card: #fefefa;
+  --card-foreground: #2c2c24;
+  --popover: #fefefa;
+  --popover-foreground: #2c2c24;
+  --primary: #5d7052; /* Organic Moss Green */
+  --primary-foreground: #f3f4f1; /* Off-white text on Primary */
+  --secondary: #c18c5d; /* Organic Terracotta */
+  --secondary-foreground: #ffffff;
+  --accent: #e6dccd; /* Warm Clay / Beige */
+  --accent-foreground: #4a4a40;
+  --muted: #f0ebe5; /* Light Sand */
+  --muted-foreground: #78786c; /* Muted Gray-Olive */
+  --border: #ded8cf;
+  --input: #ded8cf;
+  --ring: #5d7052; /* Focus Ring (Moss Green) */
+  --destructive: #a85448; /* Coral Red */
 
-  /* Help-desk semantic mappings */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: var(--palette-white);
-  --success: var(--primary);
-  --success-foreground: var(--primary-foreground);
-  --success-muted: var(--muted);
-  --warning: var(--secondary);
-  --warning-foreground: var(--foreground);
-  --warning-muted: var(--muted);
-  --link: var(--primary);
+  /* --- 2. Semantic Status Colors --- */
+  --success: #5d7052;
+  --success-foreground: #f3f4f1;
+  --success-muted: #f0ebe5;
+  --warning: #c18c5d;
+  --warning-foreground: #ffffff;
+  --warning-muted: #f0ebe5;
 
-  --status-open: var(--accent);
-  --status-open-foreground: var(--foreground);
-  --status-in-progress: var(--primary);
-  --status-in-progress-foreground: var(--primary-foreground);
-  --status-awaiting-reply: var(--warning);
-  --status-awaiting-reply-foreground: var(--warning-foreground);
-  --status-resolved: var(--success);
-  --status-resolved-foreground: var(--success-foreground);
-  --status-closed: var(--muted);
-  --status-closed-foreground: var(--muted-foreground);
-  --priority-low: var(--muted);
-  --priority-low-foreground: var(--muted-foreground);
-  --priority-normal: var(--accent);
-  --priority-normal-foreground: var(--accent-foreground);
-  --priority-high: var(--warning);
-  --priority-high-foreground: var(--warning-foreground);
-  --priority-urgent: var(--destructive);
-  --priority-urgent-foreground: var(--destructive-foreground);
-
-  --weight-regular: 400;
-  --weight-semibold: 600;
-  --weight-bold: 700;
-
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --space-16: 4rem;
-  --layout-max: 80rem;
-  --article-max: 70ch;
-  --sidebar-width: 16rem;
-  --header-height: 4rem;
-  --control-height: 2.75rem;
-  --ticket-row-height: 3.5rem;
-
+  /* --- 3. Layout & Borders Base --- */
   --radius: 0.625rem;
-  --border-width: 1px;
-  --focus-width: 2px;
-  --focus-offset: 3px;
-  --overlay: rgba(44, 44, 36, 0.35);
-  --z-sticky: 10;
-  --z-dropdown: 20;
-  --z-overlay: 30;
-  --z-modal: 40;
-  --z-toast: 50;
-  --duration-fast: 120ms;
-  --duration-normal: 180ms;
-  --duration-slow: 300ms;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #fefefa;
+  --sidebar-foreground: #2c2c24;
+  --sidebar-primary: #5d7052;
+  --sidebar-primary-foreground: #f3f4f1;
+  --sidebar-accent: #f0ebe5;
+  --sidebar-accent-foreground: #4a4a40;
+  --sidebar-border: #ded8cf;
+  --sidebar-ring: #5d7052;
 }
 
-/* Static keeps these tokens available even before utilities are used. */
-@theme static {
-  --font-sans: "Nunito", system-ui, sans-serif;
-  --font-serif: "Fraunces", Georgia, serif;
-  --font-mono: ui-monospace, Consolas, monospace;
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 2rem;
-  --text-3xl: 2.5rem;
-  --leading-tight: 1.2;
-  --leading-normal: 1.5;
-  --leading-reading: 1.65;
-  --radius-control: 0.5rem;
-  --radius-panel: 0.75rem;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-full: 9999px;
-  --shadow-soft: 0 4px 20px -2px rgba(93, 112, 82, 0.15);
-  --shadow-float: 0 10px 40px -10px rgba(193, 140, 93, 0.2);
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-
-  --spacing: 0.25rem;
-  --breakpoint-md: 48rem;
-  --breakpoint-lg: 64rem;
-
-  /* Set line heights explicitly when replacing Tailwind's type scale. */
-  --text-xs--line-height: 1.5;
-  --text-sm--line-height: 1.5;
-  --text-base--line-height: 1.5;
-  --text-lg--line-height: 1.5;
-  --text-xl--line-height: 1.2;
-  --text-2xl--line-height: 1.2;
-  --text-3xl--line-height: 1.2;
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Keep your existing dark mode variables here, or update when PM provides them */
+  }
 }
 
-/* Inline resolves aliases in the element's scope and avoids self-references. */
 @theme inline {
+  /* --- Map CSS Variables to Tailwind v4 Utilities --- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -197,267 +76,223 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-success-muted: var(--success-muted);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-muted: var(--warning-muted);
-  --color-link: var(--link);
-  --color-status-open: var(--status-open);
-  --color-status-open-foreground: var(--status-open-foreground);
-  --color-status-in-progress: var(--status-in-progress);
-  --color-status-in-progress-foreground: var(--status-in-progress-foreground);
-  --color-status-awaiting-reply: var(--status-awaiting-reply);
-  --color-status-awaiting-reply-foreground: var(--status-awaiting-reply-foreground);
-  --color-status-resolved: var(--status-resolved);
-  --color-status-resolved-foreground: var(--status-resolved-foreground);
-  --color-status-closed: var(--status-closed);
-  --color-status-closed-foreground: var(--status-closed-foreground);
-  --color-priority-low: var(--priority-low);
-  --color-priority-low-foreground: var(--priority-low-foreground);
-  --color-priority-normal: var(--priority-normal);
-  --color-priority-normal-foreground: var(--priority-normal-foreground);
-  --color-priority-high: var(--priority-high);
-  --color-priority-high-foreground: var(--priority-high-foreground);
-  --color-priority-urgent: var(--priority-urgent);
-  --color-priority-urgent-foreground: var(--priority-urgent-foreground);
-  --color-overlay: var(--overlay);
 
-  --font-weight-normal: var(--weight-regular);
-  --font-weight-semibold: var(--weight-semibold);
-  --font-weight-bold: var(--weight-bold);
-  --container-layout: var(--layout-max);
-  --container-article: var(--article-max);
-  --spacing-sidebar: var(--sidebar-width);
-  --spacing-header: var(--header-height);
-  --spacing-control: var(--control-height);
-  --spacing-ticket-row: var(--ticket-row-height);
+  /* --- Typography --- */
+  --font-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), serif;
   --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+
+  /* --- Dynamic Border Radii --- */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* --- Custom Brand Shadows --- */
+  --shadow-soft: 0 4px 20px -2px rgba(93, 112, 82, 0.15);
+  --shadow-float: 0 10px 40px -10px rgba(193, 140, 93, 0.2);
+  --shadow-3xl: 0 35px 60px -12px rgba(0, 0, 0, 0.25);
+
+  /* --- Sidebar Directives --- */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* --- Chart Directives --- */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* --- Animations --- */
+  --animate-fade-in: fade-in 0.6s ease-out;
+  --animate-fade-in-up: fade-in-up 0.6s ease-out;
+  --animate-fade-in-left: fade-in-left 0.6s ease-out;
+  --animate-fade-in-right: fade-in-right 0.6s ease-out;
+  --animate-fade-in-slow: fade-in 0.8s ease-out;
+  --animate-page-enter: page-enter 0.3s ease-out;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-delayed: float 6s ease-in-out infinite 2s;
+  --animate-gentle-rotate: gentle-rotate 20s linear infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in-up {
+    from {
+      transform: translateY(30px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in-left {
+    from {
+      transform: translateX(-8px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in-right {
+    from {
+      transform: translateX(8px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  @keyframes page-enter {
+    from {
+      transform: translateY(6px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+  @keyframes gentle-rotate {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+/* --- Base Body Styling --- */
+body {
+  font-family: var(--font-sans);
+}
+
+/* --- Asymmetric Blob & Organic Shape Utilities --- */
+.blob-shape-1 {
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+}
+.blob-shape-2 {
+  border-radius: 50% 50% 30% 70% / 50% 60% 40% 50%;
+}
+.blob-shape-3 {
+  border-radius: 40% 60% 70% 30% / 40% 50% 50% 60%;
+}
+
+.organic-card-1 {
+  border-radius: 2rem 4rem 2rem 3rem;
+}
+.organic-card-2 {
+  border-radius: 3rem 2rem 4rem 2rem;
+}
+.organic-card-3 {
+  border-radius: 2rem 3rem 2rem 4rem;
+}
+.organic-card-4 {
+  border-radius: 4rem 2rem 3rem 2rem;
+}
+.organic-card-5 {
+  border-radius: 3rem 4rem 2rem 2rem;
+}
+.organic-card-6 {
+  border-radius: 2rem 2rem 4rem 3rem;
+}
+
+/* --- Staggered Animation Delays --- */
+.animation-delay-100 {
+  animation-delay: 0.1s;
+}
+.animation-delay-200 {
+  animation-delay: 0.15s;
+}
+.animation-delay-300 {
+  animation-delay: 0.2s;
+}
+.animation-delay-400 {
+  animation-delay: 0.25s;
+}
+.animation-delay-500 {
+  animation-delay: 0.3s;
+}
+.animation-delay-600 {
+  animation-delay: 0.35s;
+}
+.animation-delay-700 {
+  animation-delay: 0.4s;
+}
+.animation-delay-800 {
+  animation-delay: 0.45s;
+}
+.animation-delay-900 {
+  animation-delay: 0.5s;
+}
+.animation-delay-1000 {
+  animation-delay: 0.55s;
+}
+
+.dark {
+  --background: #1c1c16;
+  --foreground: #f3f4f1;
+  --card: #25251f;
+  --card-foreground: #f3f4f1;
+  --popover: #25251f;
+  --popover-foreground: #f3f4f1;
+  --primary: #8ca37e;
+  --primary-foreground: #1c1c16;
+  --secondary: #d9a778;
+  --secondary-foreground: #1c1c16;
+  --muted: #2d2d25;
+  --muted-foreground: #a1a194;
+  --accent: #3a3a31;
+  --accent-foreground: #f3f4f1;
+  --destructive: #c46b5e;
+  --border: rgba(238, 233, 223, 0.1);
+  --input: rgba(238, 233, 223, 0.15);
+  --ring: #8ca37e;
 }
 
 @layer base {
-  *,
-  ::before,
-  ::after,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--border);
-  }
-
-  html {
-    color-scheme: light;
-    font-family: var(--font-sans);
-    background-color: var(--background);
-    color: var(--foreground);
-    -webkit-text-size-adjust: 100%;
-    @apply font-sans;
-  }
-
-  body {
-    min-height: 100vh;
-    min-height: 100dvh;
-    margin: 0;
-    font-size: var(--text-base);
-    font-weight: var(--weight-regular);
-    line-height: var(--leading-normal);
-    @apply bg-background text-foreground;
-  }
-
-  :where(h1, h2, h3, h4, h5, h6) {
-    font-weight: var(--weight-bold);
-    line-height: var(--leading-tight);
-    overflow-wrap: break-word;
-  }
-
-  :where(button, input, select, textarea) {
-    font: inherit;
-    accent-color: var(--primary);
-  }
-
-  :where(input, textarea)::placeholder {
-    color: var(--muted-foreground);
-    opacity: 1;
-  }
-
-  :where(button:enabled, [role="button"]:not([aria-disabled="true"])) {
-    cursor: pointer;
-  }
-
-  :where(:disabled, [aria-disabled="true"]) {
-    cursor: not-allowed;
-  }
-
-  :focus-visible {
-    outline: var(--focus-width) solid var(--focus-color, var(--ring));
-    outline-offset: var(--focus-offset);
-  }
-
-  ::selection {
-    background-color: var(--accent);
-    color: var(--foreground);
-  }
-
-  :where(code, kbd, pre, samp) {
-    font-family: var(--font-mono);
-  }
-
-  :where(dialog)::backdrop {
-    background-color: var(--overlay);
-  }
   * {
     @apply border-border outline-ring/50;
   }
-}
-
-/* Opt-in helpers; Tailwind utilities can override component-layer styles. */
-@layer components {
-  .helpdesk-link {
-    color: var(--link);
-    text-decoration-line: underline;
-    text-underline-offset: 0.2em;
-    text-decoration-thickness: 1px;
+  body {
+    @apply bg-background text-foreground;
   }
-
-  .helpdesk-link:hover {
-    text-decoration-thickness: 2px;
+  html {
+    @apply font-sans;
   }
-
-  .helpdesk-field {
-    width: 100%;
-    min-height: var(--control-height);
-    border: var(--border-width) solid var(--input);
-    border-radius: var(--radius-control);
-    background-color: var(--card);
-    color: var(--foreground);
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--text-base);
-    transition: border-color var(--duration-fast) var(--ease-standard);
-  }
-
-  .helpdesk-field[aria-invalid="true"] {
-    border-color: var(--destructive);
-  }
-
-  .helpdesk-field:disabled {
-    background-color: var(--muted);
-    color: var(--muted-foreground);
-    opacity: 1;
-  }
-}
-
-@utility focus-on-brand {
-  --focus-color: var(--palette-cream);
-}
-
-@utility duration-fast {
-  transition-duration: var(--duration-fast);
-}
-
-@utility duration-normal {
-  transition-duration: var(--duration-normal);
-}
-
-@utility duration-slow {
-  transition-duration: var(--duration-slow);
-}
-
-@utility z-sticky {
-  z-index: var(--z-sticky);
-}
-
-@utility z-dropdown {
-  z-index: var(--z-dropdown);
-}
-
-@utility z-overlay {
-  z-index: var(--z-overlay);
-}
-
-@utility z-modal {
-  z-index: var(--z-modal);
-}
-
-@utility z-toast {
-  z-index: var(--z-toast);
-}
-
-/* Keep reduced-motion overrides after utilities so they take precedence. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    animation-delay: 0ms !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-@media (forced-colors: active) {
-  :focus-visible {
-    outline-color: Highlight;
-  }
-}
-
-/*
- ---break---
- */
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
 }
