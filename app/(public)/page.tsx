@@ -1,6 +1,6 @@
-import { FeatureGrid } from "./_components/landing/feature-grid";
-import { LandingHero } from "./_components/landing/landing-hero";
-import { SupportNotice } from "./_components/landing/support-notice";
+import { FeatureGrid } from "../../features/landing/feature-grid";
+import { LandingHero } from "../../features/landing/landing-hero";
+import { SupportNotice } from "../../features/landing/support-notice";
 
 export default function PublicHomePage() {
   return (
