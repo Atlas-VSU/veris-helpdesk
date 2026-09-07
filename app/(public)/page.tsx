@@ -1,16 +1,15 @@
-/*
-    (public)/ — Groups all routes that are accessible to users without requiring admin authentication, without affecting the URL path.
-
-    page.tsx — Serves as the public homepage of the helpdesk, typically providing entry points for submitting or tracking tickets.
-*/
+import { FeatureGrid } from "./_components/landing/feature-grid";
+import { LandingHero } from "./_components/landing/landing-hero";
+import { SupportNotice } from "./_components/landing/support-notice";
 
 export default function PublicHomePage() {
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-16">
-      <h1 className="text-3xl font-bold">Veris Helpdesk</h1>
-      <p className="mt-4 text-muted-foreground">
-        Submit a support request or track an existing ticket.
-      </p>
+    <main className="flex flex-1 flex-col items-center justify-center bg-[var(--palette-cream)] px-4 py-16 sm:px-8 lg:px-12">
+      <div className="w-full max-w-3xl space-y-10">
+        <LandingHero />
+        <SupportNotice />
+        <FeatureGrid />
+      </div>
     </main>
   );
 }
