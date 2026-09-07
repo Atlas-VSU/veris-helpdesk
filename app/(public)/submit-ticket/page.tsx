@@ -88,7 +88,6 @@ export default function SubmitTicketPage() {
                 <SelectField id="userType" label="User Type">
                   <option>Subscriber</option>
                   <option>Student</option>
-                  <option>Guest</option>
                 </SelectField>
                 <SelectField id="service" label="Service / Product">
                   <option value="">Select a service...</option>
