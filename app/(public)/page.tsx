@@ -7,7 +7,7 @@ export default function PublicHomePage() {
     <main className="flex flex-1 flex-col items-center justify-center bg-[var(--palette-cream)] px-4 py-16 sm:px-8 lg:px-12">
       <div className="w-full max-w-3xl space-y-10">
         <LandingHero />
-        <SupportNotice />
+        {/* <SupportNotice /> */}
         <FeatureGrid />
       </div>
     </main>
