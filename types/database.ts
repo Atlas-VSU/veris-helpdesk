@@ -44,3 +44,15 @@ export type Attachment = {
   storage_path: string;
   created_at: string;
 };
+
+export type TicketFormData = {
+  fullName: string;
+  email: string;
+  userType: UserType;
+  service: string;
+  subject: string;
+  description: string;
+  priority: TicketPriority;
+  contactMethod: "Email" | "Phone";
+  consent: boolean;
+};
