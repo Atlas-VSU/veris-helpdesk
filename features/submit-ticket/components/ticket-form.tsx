@@ -1,21 +1,8 @@
 import Link from "next/link";
-import { ChangeEvent, FormEvent } from "react";
 import { Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { TicketFormData } from "@/features/submit-ticket/types/types";
+import type { TicketFormProps } from "@/features/submit-ticket/types/types";
 import { FileUploadField, SelectField, TextAreaField, TextField } from "@/features/submit-ticket/components/form-fields";
-
-type TicketFormProps = {
-  formData: TicketFormData;
-  fileName: string;
-  isSubmitting: boolean;
-  onInputChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSelectChange: (event: ChangeEvent<HTMLSelectElement>) => void;
-  onConsentChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onCancel: () => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-};
 
 export function TicketForm({
   formData,

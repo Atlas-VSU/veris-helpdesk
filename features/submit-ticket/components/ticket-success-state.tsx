@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-type TicketSuccessStateProps = {
-  email: string;
-  description: string;
-  ticketNumber: string;
-  onSubmitAnother: () => void;
-};
+import type { TicketSuccessStateProps } from "@/features/submit-ticket/types/types";
 
 export function TicketSuccessState({ email, description, ticketNumber, onSubmitAnother }: TicketSuccessStateProps) {
   return (

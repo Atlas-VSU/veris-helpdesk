@@ -1,30 +1,23 @@
-import { ChangeEvent, ReactNode } from "react";
 import { ChevronDown, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type {
+  FieldLabelProps,
+  FileUploadFieldProps,
+  SelectFieldProps,
+  TextAreaFieldProps,
+  TextFieldProps,
+} from "@/features/submit-ticket/types/types";
 
-type BaseFieldProps = {
-  id: string;
-  label: string;
-};
-
-export function FieldLabel({ id, children }: { id: string; children: ReactNode }) {
+export function FieldLabel({ id, children }: FieldLabelProps) {
   return (
     <Label htmlFor={id}>
       {children}
     </Label>
   );
 }
-
-type TextFieldProps = BaseFieldProps & {
-  name: string;
-  value: string;
-  placeholder: string;
-  type?: "text" | "email";
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-};
 
 export function TextField({ id, label, name, onChange, placeholder, type = "text", value }: TextFieldProps) {
   return (
@@ -34,12 +27,6 @@ export function TextField({ id, label, name, onChange, placeholder, type = "text
     </div>
   );
 }
-
-type SelectFieldProps = BaseFieldProps & {
-  value: string;
-  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
-  children: ReactNode;
-};
 
 export function SelectField({ id, label, value, onChange, children }: SelectFieldProps) {
   return (
@@ -55,12 +42,6 @@ export function SelectField({ id, label, value, onChange, children }: SelectFiel
   );
 }
 
-type TextAreaFieldProps = BaseFieldProps & {
-  value: string;
-  placeholder: string;
-  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
-};
-
 export function TextAreaField({ id, label, onChange, placeholder, value }: TextAreaFieldProps) {
   return (
     <div className="flex flex-col gap-1">
@@ -69,11 +50,6 @@ export function TextAreaField({ id, label, onChange, placeholder, value }: TextA
     </div>
   );
 }
-
-type FileUploadFieldProps = {
-  fileName: string;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-};
 
 export function FileUploadField({ fileName, onChange }: FileUploadFieldProps) {
   return (
