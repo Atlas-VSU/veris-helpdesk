@@ -37,53 +37,61 @@ export async function POST(request: Request) {
     );
   }
 
-  const { email, password } = result.data;
-  const supabase = getSupabaseServerClient();
+  try {
+    const { email, password } = result.data;
+    const supabase = getSupabaseServerClient();
 
-  const { data: admin, error } = await supabase
-    .from("admins")
-    .select("id, email, password_hash, full_name")
-    .eq("email", email)
-    .single<AdminRow>();
+    const { data: admin, error } = await supabase
+      .from("admins")
+      .select("id, email, password_hash, full_name")
+      .eq("email", email)
+      .single<AdminRow>();
 
-  if (error || !admin) {
+    if (error || !admin) {
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 },
+      );
+    }
+
+    const passwordMatches = await bcrypt.compare(password, admin.password_hash);
+
+    if (!passwordMatches) {
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 },
+      );
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      throw new Error("Missing required env var: JWT_SECRET");
+    }
+
+    const token = jwt.sign({ adminId: admin.id, email: admin.email }, jwtSecret, {
+      expiresIn: "24h",
+    });
+
+    const response = NextResponse.json({
+      message: "Login successful",
+      admin: { id: admin.id, email: admin.email, full_name: admin.full_name },
+    });
+
+    response.cookies.set("admin_session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24,
+      path: "/",
+    });
+
+    return response;
+  } catch (err) {
+    console.error("Admin login error:", err);
     return NextResponse.json(
-      { error: "Invalid email or password" },
-      { status: 401 },
+      { error: "Something went wrong. Please try again." },
+      { status: 500 },
     );
   }
-
-  const passwordMatches = await bcrypt.compare(password, admin.password_hash);
-
-  if (!passwordMatches) {
-    return NextResponse.json(
-      { error: "Invalid email or password" },
-      { status: 401 },
-    );
-  }
-
-  const jwtSecret = process.env.JWT_SECRET;
-
-  if (!jwtSecret) {
-    throw new Error("Missing required env var: JWT_SECRET");
-  }
-
-  const token = jwt.sign({ adminId: admin.id, email: admin.email }, jwtSecret, {
-    expiresIn: "24h",
-  });
-
-  const response = NextResponse.json({
-    message: "Login successful",
-    admin: { id: admin.id, email: admin.email, full_name: admin.full_name },
-  });
-
-  response.cookies.set("admin_session", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24,
-    path: "/",
-  });
-
-  return response;
 }
