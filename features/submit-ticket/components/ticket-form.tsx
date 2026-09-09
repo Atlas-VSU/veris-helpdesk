@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChangeEvent, FormEvent } from "react";
 import { Send, ShieldCheck } from "lucide-react";
 import type { TicketFormData } from "@/types/database";
-import { FileUploadField, SelectField, TextAreaField, TextField } from "@/components/submit-ticket/form-fields";
+import { FileUploadField, SelectField, TextAreaField, TextField } from "@/features/submit-ticket/components/form-fields";
 
 type TicketFormProps = {
   formData: TicketFormData;
@@ -28,7 +28,7 @@ export function TicketForm({
   onSubmit,
 }: TicketFormProps) {
   return (
-    <form className="rounded-3xl border border-[#DED8CF] bg-[#FEFEFA] p-6 shadow-[0_20px_40px_rgba(93,112,82,0.08)] md:p-10" onSubmit={onSubmit}>
+    <form className="rounded-3xl border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-6 shadow-soft md:p-10" onSubmit={onSubmit}>
       <div className="space-y-8">
         <div className="grid gap-6 md:grid-cols-2">
           <TextField id="fullName" label="Full Name" name="fullName" onChange={onInputChange} placeholder="Jane Doe" value={formData.fullName} />
@@ -59,7 +59,7 @@ export function TicketForm({
               <option value="high">High (Significant impact)</option>
               <option value="urgent">Urgent (System-down)</option>
             </SelectField>
-            <p className="mt-1 text-xs text-[#78786C]">Priority Low: Minor issue, Priority Urgent: System-down</p>
+            <p className="mt-1 text-xs text-[var(--palette-gray-olive)]">Priority Low: Minor issue, Priority Urgent: System-down</p>
           </div>
           <SelectField id="contactMethod" label="Preferred Contact Method" onChange={onSelectChange} value={formData.contactMethod}>
             <option>Email</option>
@@ -69,19 +69,19 @@ export function TicketForm({
 
         <FileUploadField fileName={fileName} onChange={onFileChange} />
 
-        <div className="space-y-6 border-t border-[#DED8CF] pt-6">
-          <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-[#4A4A40]" htmlFor="consent">
-            <input checked={formData.consent} className="mt-1 size-4 rounded border-[#DED8CF] accent-[#45573B]" id="consent" name="consent" onChange={onConsentChange} required type="checkbox" />
-            <span>I consent to the collection and processing of my data for the purpose of handling this request according to the <Link className="text-[#45573B] underline" href="/privacy">Privacy Policy</Link>.</span>
+        <div className="space-y-6 border-t border-[var(--palette-stone)] pt-6">
+          <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-[var(--palette-dark-olive)]" htmlFor="consent">
+            <input checked={formData.consent} className="mt-1 size-4 rounded border-[var(--palette-stone)] accent-[var(--palette-dark-olive)]" id="consent" name="consent" onChange={onConsentChange} required type="checkbox" />
+            <span>I consent to the collection and processing of my data for the purpose of handling this request according to the <Link className="text-[var(--palette-dark-olive)] underline" href="/privacy">Privacy Policy</Link>.</span>
           </label>
-          <div className="flex w-fit items-center gap-2 rounded-lg border border-[#DED8CF] bg-[#E5E3D6] px-3 py-2 text-sm italic text-[#78786C]">
+          <div className="flex w-fit items-center gap-2 rounded-lg border border-[var(--palette-stone)] bg-[var(--palette-off-white)] px-3 py-2 text-sm italic text-[var(--palette-gray-olive)]">
             <ShieldCheck aria-hidden="true" className="size-4" />
             <span>[ CAPTCHA Placeholder ]</span>
           </div>
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-end gap-6">
-              <button className="text-sm font-bold text-[#78786C] transition-colors hover:text-[#2C2C24]" onClick={onCancel} type="button">Cancel</button>
-              <button className="flex items-center justify-center gap-2 rounded-lg bg-[#45573B] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#5D7052] disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">
+              <button className="text-sm font-bold text-[var(--palette-gray-olive)] transition-colors hover:text-[var(--palette-charcoal-olive)]" onClick={onCancel} type="button">Cancel</button>
+              <button className="flex items-center justify-center gap-2 rounded-lg bg-[var(--palette-dark-olive)] px-6 py-3 text-sm font-bold text-[var(--palette-white)] transition-colors hover:bg-[var(--palette-moss)] disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">
                 {isSubmitting ? "Submitting..." : "Submit Ticket"}
                 <Send aria-hidden="true" className="size-4" />
               </button>

@@ -2,7 +2,7 @@ import { ChangeEvent, ReactNode } from "react";
 import { ChevronDown, Upload } from "lucide-react";
 
 export const inputClassName =
-  "w-full rounded-lg border border-[#DED8CF] bg-[#E6DCCD]/20 px-3 py-3 text-base text-[#2C2C24] outline-none transition focus:border-[#45573B] focus:ring-4 focus:ring-[#5D7052]/15";
+  "w-full rounded-lg border border-[var(--palette-stone)] bg-[var(--palette-clay)]/20 px-3 py-3 text-base text-[var(--palette-charcoal-olive)] outline-none transition focus:border-[var(--palette-dark-olive)] focus:ring-4 focus:ring-[var(--palette-moss)]/15";
 
 type BaseFieldProps = {
   id: string;
@@ -11,7 +11,7 @@ type BaseFieldProps = {
 
 export function FieldLabel({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <label className="text-xs font-bold uppercase tracking-[0.04em] text-[#2C2C24]" htmlFor={id}>
+    <label className="text-xs font-bold uppercase tracking-[0.04em] text-[var(--palette-charcoal-olive)]" htmlFor={id}>
       {children}
     </label>
   );
@@ -48,7 +48,7 @@ export function SelectField({ id, label, value, onChange, children }: SelectFiel
         <select className={`${inputClassName} appearance-none pr-10`} id={id} name={id} onChange={onChange} value={value}>
           {children}
         </select>
-        <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#78786C]" />
+        <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[var(--palette-gray-olive)]" />
       </div>
     </div>
   );
@@ -78,10 +78,10 @@ export function FileUploadField({ fileName, onChange }: FileUploadFieldProps) {
   return (
     <div className="flex flex-col gap-1">
       <FieldLabel id="attachment">Attachments</FieldLabel>
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[#DED8CF] bg-[#E6DCCD]/10 p-8 text-center transition hover:bg-[#E6DCCD]/20" htmlFor="attachment">
-        <Upload aria-hidden="true" className="size-8 text-[#78786C]" />
-        <span className="text-base text-[#4A4A40]">Drag and drop files here, or <span className="font-bold text-[#45573B] underline">browse</span></span>
-        <span className="text-xs text-[#78786C]">{fileName || "Max file size: 10MB"}</span>
+      <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[var(--palette-stone)] bg-[var(--palette-clay)]/10 p-8 text-center transition hover:bg-[var(--palette-clay)]/20" htmlFor="attachment">
+        <Upload aria-hidden="true" className="size-8 text-[var(--palette-gray-olive)]" />
+        <span className="text-base text-[var(--palette-dark-olive)]">Drag and drop files here, or <span className="font-bold text-[var(--palette-dark-olive)] underline">browse</span></span>
+        <span className="text-xs text-[var(--palette-gray-olive)]">{fileName || "Max file size: 10MB"}</span>
       </label>
       <input className="sr-only" id="attachment" key={fileName || "empty"} name="attachment" onChange={onChange} type="file" />
     </div>

@@ -3,8 +3,8 @@
 import { ChangeEvent, FormEvent, useState } from "react";
 import type { TicketFormData } from "@/types/database";
 import { PublicHeader } from "@/components/layout/public-header";
-import { TicketForm } from "@/components/submit-ticket/ticket-form";
-import { TicketSuccessState } from "@/components/submit-ticket/ticket-success-state";
+import { TicketForm } from "@/features/submit-ticket/components/ticket-form";
+import { TicketSuccessState } from "@/features/submit-ticket/components/ticket-success-state";
 
 const initialFormData: TicketFormData = {
   fullName: "",
@@ -64,8 +64,8 @@ export default function SubmitTicketPage() {
   ) : (
     <div className="mx-auto max-w-3xl">
       <div className="mb-10 text-center">
-        <h1 className="font-serif text-4xl font-semibold text-[#45573B] md:text-5xl">Submit a Request</h1>
-        <p className="mt-3 text-lg leading-7 text-[#4A4A40]">We&apos;re here to help. Tell us what you need, and we&apos;ll get back to you shortly.</p>
+        <h1 className="font-serif text-4xl font-semibold text-[var(--palette-dark-olive)] md:text-5xl">Submit a Request</h1>
+        <p className="mt-3 text-lg leading-7 text-[var(--palette-dark-olive)]">We&apos;re here to help. Tell us what you need, and we&apos;ll get back to you shortly.</p>
       </div>
 
       <TicketForm
@@ -83,7 +83,7 @@ export default function SubmitTicketPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#FDFCF8] text-[#2C2C24]">
+    <div className="min-h-screen bg-[var(--palette-cream)] text-[var(--palette-charcoal-olive)]">
       <PublicHeader activeHref="/submit-ticket" />
 
       <main className="mx-auto max-w-[1440px] px-4 py-10 sm:px-6 md:px-12 md:py-16">
