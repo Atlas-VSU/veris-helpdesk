@@ -13,7 +13,7 @@ A ticketing system for VERIS clients (subscribers and students) to submit suppor
 - **Icons**: Lucide React
 - **Backend / Database**: Supabase (Postgres, Auth, Storage, Edge Functions)
 - **Email**: Resend (ticket confirmations, OTP codes, admin notifications)
-- **Forms & Validation**: React Hook Form + Zod
+- **Forms & Validation**: React Hook Form + Zod (schemas live in `features/<domain>/schemas/`, see [Repository Architecture](#repository-architecture))
 - **Migrations**: Supabase CLI (migration-first workflow — see [Database Setup](#database-setup))
 
 ---
@@ -21,25 +21,46 @@ A ticketing system for VERIS clients (subscribers and students) to submit suppor
 ## Repository Architecture
 
 ```text
-app/                            # Next.js App Router (Routes & Layouts)
-├── page.tsx                    # Landing page
-├── submit/                     # Submit Ticket Form
-├── verify/                     # Email Verification (OTP)
-├── tickets/                    # My Tickets Dashboard
+app/                              # Next.js App Router (Routes & Layouts)
+├── (public)/                     # Client-facing routes (route group)
+│   ├── page.tsx                  # Landing page
+│   ├── privacy/                  # Privacy Policy
+│   ├── submit-ticket/            # Submit Ticket Form
+│   ├── verify/                   # Email Verification (OTP)
+│   └── tickets/                  # My Tickets Dashboard
+│       └── [ticketNumber]/       # Single ticket view
 ├── admin/
-│   ├── login/                  # Admin Login
-│   ├── dashboard/               # Admin Dashboard (stats, notifications inbox)
-│   ├── tickets/                 # Tickets Management (search, filter, table)
-│   └── tickets/[id]/            # Admin Ticket Workspace (thread, reply, status)
+│   ├── login/                    # Admin Login
+│   └── (protected)/              # Auth-gated admin routes (route group)
+│       ├── dashboard/            # Admin Dashboard (stats, notifications inbox)
+│       ├── tickets/              # Tickets Management (search, filter, table)
+│       │   └── [ticketNumber]/   # Admin Ticket Workspace (thread, reply, status)
+│       ├── clients/              # Client records
+│       ├── categories/           # Ticket categories
+│       └── admins/               # Admin account management
+├── api/
+│   └── admin/login/              # Admin login endpoint (Zod-validated)
 ├── layout.tsx
-components/                     # Shared UI (form fields, buttons, cards, badges)
+components/
+└── ui/                            # Shared UI primitives (button, card, ...)
+features/                          # Feature-scoped logic, grouped by domain
+├── landing/                       # components/, data/, types/ for the landing page
+├── tickets/
+│   └── schemas/                   # Zod schemas — create ticket, request/verify OTP
+└── admin/
+    └── schemas/                   # Zod schemas — admin login
 lib/
-├── supabase/                   # Supabase client init (browser + server)
-└── validation/                 # Zod schemas
+├── supabase-server.ts             # Supabase service-role client (server-side only)
+├── rate-limit.ts                  # Rate-limiting middleware
+└── utils.ts
+types/
+└── database.ts                    # Shared DB row types
 supabase/
 ├── config.toml
-└── migrations/                 # Versioned schema migrations (source of truth for DB)
+└── migrations/                    # Versioned schema migrations (source of truth for DB)
 ```
+
+**Convention:** feature-specific logic (validation schemas, and eventually feature-scoped components/hooks) lives under `features/<domain>/`, following the pattern already established by `features/landing/`. Shared, non-feature-specific code (Supabase clients, generic utilities) stays in `lib/`.
 
 ---
 
@@ -48,6 +69,7 @@ supabase/
 ### Core MVP
 
 **Client-facing**
+
 - Landing page (nav, hero, submit/track CTAs, expected response time, footer)
 - Submit Ticket Form (name, email, user type, service, subject, description, priority, attachment, consent, CAPTCHA)
 - Email Verification (OTP) to access "My Tickets"
@@ -55,12 +77,14 @@ supabase/
 - My Tickets Dashboard (status filter, search, ticket cards)
 
 **Admin-facing**
+
 - Admin Login
 - Admin Dashboard (ticket totals, urgent count, status breakdown, recent tickets, **notifications inbox**)
 - Tickets Management (search, status filter, table, pagination)
 - Admin Ticket Workspace (conversation thread, reply-to-client with auto-email, attach file to reply, change status/priority, resolve/request-info actions)
 
 **Backend**
+
 - DB schema (see [Database Setup](#database-setup))
 - Ticket number generator
 - Client OTP verification, Admin login, session timeout, route auth middleware, rate limiting
@@ -86,14 +110,14 @@ Schema lives in `supabase/migrations/` — **not** the dashboard SQL editor. Alw
 
 ### Tables
 
-| Table | Purpose |
-|---|---|
-| `admins` | Flat admin accounts (no roles for MVP) |
-| `tickets` | Core ticket record — submitter info, issue details, priority, status |
-| `messages` | Conversation thread — client and admin replies |
-| `attachments` | Files linked to a ticket or a specific message |
-| `otp_verifications` | Email OTP codes for the "My Tickets" access flow |
-| `notifications` | Admin dashboard inbox — new ticket / client reply events |
+| Table               | Purpose                                                              |
+| ------------------- | -------------------------------------------------------------------- |
+| `admins`            | Flat admin accounts (no roles for MVP)                               |
+| `tickets`           | Core ticket record — submitter info, issue details, priority, status |
+| `messages`          | Conversation thread — client and admin replies                       |
+| `attachments`       | Files linked to a ticket or a specific message                       |
+| `otp_verifications` | Email OTP codes for the "My Tickets" access flow                     |
+| `notifications`     | Admin dashboard inbox — new ticket / client reply events             |
 
 ### Enums
 
@@ -120,6 +144,7 @@ supabase db push
 ## Run Locally
 
 ### Prerequisites
+
 - Node.js (v18+ recommended)
 - npm
 - Supabase CLI (`npm install supabase --save-dev`)
@@ -127,34 +152,35 @@ supabase db push
 ### Setup Steps
 
 1. **Install dependencies**:
-   ```bash
+
+```bash
    npm install
-   ```
+```
 
 2. **Configure environment variables**:
-   Copy `.env.example` to `.env.local` and fill in:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=
-   RESEND_API_KEY=          # set as a Supabase secret for Edge Functions, not just here
-   ```
+   Copy `.env.example` to `.env.local`, then fill in the values shared in the team's Discord/Messenger group.
+
+   > Env vars change frequently as new features are added (Resend keys, JWT secret, etc.) — always check the group for the latest values rather than relying on old ones you may have saved locally.
 
 3. **Run the development server**:
-   ```bash
+
+```bash
    npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 4. **Verify code quality**:
-   ```bash
+
+```bash
    npm run lint
    npm run build
-   ```
+```
 
 ---
 
 ## Notes for Contributors
 
 - This is a **team learning project** — first time several of us are working in these roles, PM included. Ask questions early rather than guessing on scope; if something feels like it might be over-engineering, flag it before building.
-- Stick to Core MVP unless a lead has explicitly signed off on adding something (see the notifications inbox in this README's Core MVP section as an example of a feature added *after* lead review, not before).
+- Stick to Core MVP unless a lead has explicitly signed off on adding something (see the notifications inbox in this README's Core MVP section as an example of a feature added _after_ lead review, not before).
 - Edge Functions + Database Webhooks + Resend follow the same pattern across features (e.g. ticket confirmation, OTP, admin notifications) — check an existing implementation before building a new one from scratch.
