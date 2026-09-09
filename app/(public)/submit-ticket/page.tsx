@@ -1,10 +1,10 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";
-import type { TicketFormData } from "@/types/database";
 import { PublicHeader } from "@/components/layout/public-header";
 import { TicketForm } from "@/features/submit-ticket/components/ticket-form";
 import { TicketSuccessState } from "@/features/submit-ticket/components/ticket-success-state";
+import type { TicketFormData } from "@/features/submit-ticket/types/types";
 
 const initialFormData: TicketFormData = {
   fullName: "",
@@ -23,6 +23,7 @@ export default function SubmitTicketPage() {
   const [fileName, setFileName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [ticketNumber, setTicketNumber] = useState("");
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
@@ -42,25 +43,50 @@ export default function SubmitTicketPage() {
     setFileName(event.target.files?.[0]?.name ?? "");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setIsSubmitting(true);
 
-    window.setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const response = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: formData.fullName,
+          email: formData.email,
+          user_type: formData.userType,
+          service: formData.service,
+          subject: formData.subject,
+          description: formData.description,
+          priority: formData.priority,
+          consent_given: formData.consent,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "Unable to submit ticket");
+      }
+
+      setTicketNumber(result.ticketNumber);
       setHasSubmitted(true);
-    }, 400);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Unable to submit ticket");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleMakeAnotherTicket() {
     setFormData(initialFormData);
     setFileName("");
+    setTicketNumber("");
     setHasSubmitted(false);
   }
 
   const content = hasSubmitted ? (
-    <TicketSuccessState description={formData.description} email={formData.email} onSubmitAnother={handleMakeAnotherTicket} />
+    <TicketSuccessState description={formData.description} email={formData.email} onSubmitAnother={handleMakeAnotherTicket} ticketNumber={ticketNumber} />
   ) : (
     <div className="mx-auto max-w-3xl">
       <div className="mb-10 text-center">
