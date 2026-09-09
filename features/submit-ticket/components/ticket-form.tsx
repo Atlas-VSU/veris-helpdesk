@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { TicketFormProps } from "@/features/submit-ticket/types/types";
-import { FileUploadField, SelectField, TextAreaField, TextField } from "@/features/submit-ticket/components/form-fields";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import type {
+  TicketFormProps,
+} from "@/features/submit-ticket/types/types";
+import { FieldWithLabel, FileUploadField } from "@/features/submit-ticket/components/form-fields";
 
 export function TicketForm({
   formData,
@@ -19,40 +25,58 @@ export function TicketForm({
     <form className="rounded-3xl border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-6 shadow-soft md:p-10" onSubmit={onSubmit}>
       <div className="space-y-8">
         <div className="grid gap-6 md:grid-cols-2">
-          <TextField id="fullName" label="Full Name" name="fullName" onChange={onInputChange} placeholder="Jane Doe" value={formData.fullName} />
-          <TextField id="email" label="Email Address" name="email" onChange={onInputChange} placeholder="jane@example.com" type="email" value={formData.email} />
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="fullName">Full Name</Label>
+            <Input id="fullName" name="fullName" onChange={onInputChange} placeholder="Jane Doe" required value={formData.fullName} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="email">Email Address</Label>
+            <Input id="email" name="email" onChange={onInputChange} placeholder="jane@example.com" required type="email" value={formData.email} />
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <SelectField id="userType" label="User Type" onChange={onSelectChange} value={formData.userType}>
-            <option value="subscriber">Subscriber</option>
-            <option value="student">Student</option>
-          </SelectField>
-          <SelectField id="service" label="Service / Product" onChange={onSelectChange} value={formData.service}>
-            <option value="">Select a service...</option>
-            <option>Billing</option>
-            <option>Technical Support</option>
-            <option>General Inquiry</option>
-          </SelectField>
+          <FieldWithLabel id="userType" label="User Type" withSelectIcon>
+            <Select id="userType" name="userType" onChange={onSelectChange} value={formData.userType}>
+              <option value="subscriber">Subscriber</option>
+              <option value="student">Student</option>
+            </Select>
+          </FieldWithLabel>
+          <FieldWithLabel id="service" label="Service / Product" withSelectIcon>
+            <Select id="service" name="service" onChange={onSelectChange} value={formData.service}>
+              <option value="">Select a service...</option>
+              <option>Billing</option>
+              <option>Technical Support</option>
+              <option>General Inquiry</option>
+            </Select>
+          </FieldWithLabel>
         </div>
 
-        <TextField id="subject" label="Subject" name="subject" onChange={onInputChange} placeholder="Brief summary of the issue" value={formData.subject} />
-        <TextAreaField id="description" label="Description" onChange={onInputChange} placeholder="Please provide as much detail as possible..." value={formData.description} />
+        <FieldWithLabel id="subject" label="Subject">
+          <Input id="subject" name="subject" onChange={onInputChange} placeholder="Brief summary of the issue" required value={formData.subject} />
+        </FieldWithLabel>
+        <FieldWithLabel id="description" label="Description">
+          <Textarea className="resize-none" id="description" name="description" onChange={onInputChange} placeholder="Please provide as much detail as possible..." required rows={5} value={formData.description} />
+        </FieldWithLabel>
 
         <div className="grid gap-6 md:grid-cols-2">
           <div>
-            <SelectField id="priority" label="Priority Level" onChange={onSelectChange} value={formData.priority}>
-              <option value="low">Low (Minor issue)</option>
-              <option value="medium">Medium (Standard request)</option>
-              <option value="high">High (Significant impact)</option>
-              <option value="urgent">Urgent (System-down)</option>
-            </SelectField>
+            <FieldWithLabel id="priority" label="Priority Level" withSelectIcon>
+              <Select id="priority" name="priority" onChange={onSelectChange} value={formData.priority}>
+                <option value="low">Low (Minor issue)</option>
+                <option value="medium">Medium (Standard request)</option>
+                <option value="high">High (Significant impact)</option>
+                <option value="urgent">Urgent (System-down)</option>
+              </Select>
+            </FieldWithLabel>
             <p className="mt-1 text-xs text-[var(--palette-gray-olive)]">Priority Low: Minor issue, Priority Urgent: System-down</p>
           </div>
-          <SelectField id="contactMethod" label="Preferred Contact Method" onChange={onSelectChange} value={formData.contactMethod}>
-            <option>Email</option>
-            <option>Phone</option>
-          </SelectField>
+          <FieldWithLabel id="contactMethod" label="Preferred Contact Method" withSelectIcon>
+            <Select id="contactMethod" name="contactMethod" onChange={onSelectChange} value={formData.contactMethod}>
+              <option>Email</option>
+              <option>Phone</option>
+            </Select>
+          </FieldWithLabel>
         </div>
 
         <FileUploadField fileName={fileName} onChange={onFileChange} />

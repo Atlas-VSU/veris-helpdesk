@@ -15,36 +15,6 @@ export type TicketFormData = {
   consent: boolean;
 };
 
-export type BaseFieldProps = {
-  id: string;
-  label: string;
-};
-
-export type FieldLabelProps = {
-  id: string;
-  children: ReactNode;
-};
-
-export type TextFieldProps = BaseFieldProps & {
-  name: string;
-  value: string;
-  placeholder: string;
-  type?: "text" | "email";
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-};
-
-export type SelectFieldProps = BaseFieldProps & {
-  value: string;
-  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
-  children: ReactNode;
-};
-
-export type TextAreaFieldProps = BaseFieldProps & {
-  value: string;
-  placeholder: string;
-  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
-};
-
 export type FileUploadFieldProps = {
   fileName: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -67,4 +37,11 @@ export type TicketSuccessStateProps = {
   description: string;
   ticketNumber: string;
   onSubmitAnother: () => void;
+};
+
+export type FieldWithLabelProps = {
+  id: string;
+  label: string;
+  children: ReactNode;
+  withSelectIcon?: boolean;
 };
