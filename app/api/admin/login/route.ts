@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { AdminRow } from "@/types/database";
 import { loginRateLimit } from "@/lib/rate-limit";
+import { adminLoginSchema } from "@/features/admin/schemas/admin";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
@@ -16,13 +17,10 @@ export async function POST(request: Request) {
       { status: 429 },
     );
   }
-  let email: string;
-  let password: string;
+  let body: unknown;
 
   try {
-    const body = await request.json();
-    email = body.email;
-    password = body.password;
+    body = await request.json();
   } catch {
     return NextResponse.json(
       { error: "Invalid request body" },
@@ -30,12 +28,16 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!email || !password) {
+  const result = adminLoginSchema.safeParse(body);
+
+  if (!result.success) {
     return NextResponse.json(
-      { error: "Email and password are required" },
+      { error: result.error.issues[0].message },
       { status: 400 },
     );
   }
+
+  const { email, password } = result.data;
   const supabase = getSupabaseServerClient();
 
   const { data: admin, error } = await supabase
