@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent } from "react";
 import { Send, ShieldCheck } from "lucide-react";
-import type { TicketFormData } from "@/types/database";
+import { Button } from "@/components/ui/button";
+import type { TicketFormData } from "@/features/submit-ticket/types/types";
 import { FileUploadField, SelectField, TextAreaField, TextField } from "@/features/submit-ticket/components/form-fields";
 
 type TicketFormProps = {
@@ -80,11 +81,11 @@ export function TicketForm({
           </div>
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-end gap-6">
-              <button className="text-sm font-bold text-[var(--palette-gray-olive)] transition-colors hover:text-[var(--palette-charcoal-olive)]" onClick={onCancel} type="button">Cancel</button>
-              <button className="flex items-center justify-center gap-2 rounded-lg bg-[var(--palette-dark-olive)] px-6 py-3 text-sm font-bold text-[var(--palette-white)] transition-colors hover:bg-[var(--palette-moss)] disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">
+              <Button className="text-[var(--palette-gray-olive)] hover:bg-transparent hover:text-[var(--palette-charcoal-olive)]" onClick={onCancel} type="button" variant="ghost">Cancel</Button>
+              <Button className="bg-[var(--palette-dark-olive)] px-6 py-3 text-[var(--palette-white)] hover:bg-[var(--palette-moss)]" disabled={isSubmitting} type="submit">
                 {isSubmitting ? "Submitting..." : "Submit Ticket"}
                 <Send aria-hidden="true" className="size-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>

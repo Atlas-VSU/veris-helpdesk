@@ -1,8 +1,9 @@
 import { ChangeEvent, ReactNode } from "react";
 import { ChevronDown, Upload } from "lucide-react";
-
-export const inputClassName =
-  "w-full rounded-lg border border-[var(--palette-stone)] bg-[var(--palette-clay)]/20 px-3 py-3 text-base text-[var(--palette-charcoal-olive)] outline-none transition focus:border-[var(--palette-dark-olive)] focus:ring-4 focus:ring-[var(--palette-moss)]/15";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type BaseFieldProps = {
   id: string;
@@ -11,9 +12,9 @@ type BaseFieldProps = {
 
 export function FieldLabel({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <label className="text-xs font-bold uppercase tracking-[0.04em] text-[var(--palette-charcoal-olive)]" htmlFor={id}>
+    <Label htmlFor={id}>
       {children}
-    </label>
+    </Label>
   );
 }
 
@@ -29,7 +30,7 @@ export function TextField({ id, label, name, onChange, placeholder, type = "text
   return (
     <div className="flex flex-col gap-1">
       <FieldLabel id={id}>{label}</FieldLabel>
-      <input className={inputClassName} id={id} name={name} onChange={onChange} placeholder={placeholder} required type={type} value={value} />
+      <Input id={id} name={name} onChange={onChange} placeholder={placeholder} required type={type} value={value} />
     </div>
   );
 }
@@ -45,9 +46,9 @@ export function SelectField({ id, label, value, onChange, children }: SelectFiel
     <div className="flex flex-col gap-1">
       <FieldLabel id={id}>{label}</FieldLabel>
       <div className="relative">
-        <select className={`${inputClassName} appearance-none pr-10`} id={id} name={id} onChange={onChange} value={value}>
+        <Select id={id} name={id} onChange={onChange} value={value}>
           {children}
-        </select>
+        </Select>
         <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[var(--palette-gray-olive)]" />
       </div>
     </div>
@@ -64,7 +65,7 @@ export function TextAreaField({ id, label, onChange, placeholder, value }: TextA
   return (
     <div className="flex flex-col gap-1">
       <FieldLabel id={id}>{label}</FieldLabel>
-      <textarea className={`${inputClassName} resize-none`} id={id} name={id} onChange={onChange} placeholder={placeholder} required rows={5} value={value} />
+      <Textarea className="resize-none" id={id} name={id} onChange={onChange} placeholder={placeholder} required rows={5} value={value} />
     </div>
   );
 }
