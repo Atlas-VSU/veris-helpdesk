@@ -21,6 +21,9 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "VERIS Helpdesk",
   description: "Warm, reliable support from the VERIS team.",
+  icons: {
+    icon: "/veris-icon.png",
+  },
 };
 
 export default function RootLayout({
