@@ -4,7 +4,9 @@ import { ChangeEvent, FormEvent, useState } from "react";
 import { PublicHeader } from "@/components/layout/public-header";
 import { TicketForm } from "@/features/submit-ticket/components/ticket-form";
 import { TicketSuccessState } from "@/features/submit-ticket/components/ticket-success-state";
+import { createTicketSchema } from "@/features/tickets/schemas/ticket";
 import type { TicketFormData } from "@/features/submit-ticket/types/types";
+import { z } from "zod";
 
 const initialFormData: TicketFormData = {
   fullName: "",
@@ -46,22 +48,31 @@ export default function SubmitTicketPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const ticketPayload = {
+      full_name: formData.fullName,
+      email: formData.email,
+      user_type: formData.userType,
+      service: formData.service,
+      subject: formData.subject,
+      description: formData.description,
+      priority: formData.priority,
+      consent_given: formData.consent,
+    } satisfies z.input<typeof createTicketSchema>;
+
+    const validation = createTicketSchema.safeParse(ticketPayload);
+
+    if (!validation.success) {
+      window.alert(validation.error.issues[0]?.message ?? "Please check your ticket details");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const response = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: formData.fullName,
-          email: formData.email,
-          user_type: formData.userType,
-          service: formData.service,
-          subject: formData.subject,
-          description: formData.description,
-          priority: formData.priority,
-          consent_given: formData.consent,
-        }),
+        body: JSON.stringify(validation.data),
       });
       const result = await response.json();
 
