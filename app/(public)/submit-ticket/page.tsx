@@ -10,7 +10,6 @@ export default function SubmitTicketPage() {
     fileName,
     isSubmitting,
     hasSubmitted,
-    ticketNumber,
     handleInputChange,
     handleSelectChange,
     handleConsentChange,
@@ -20,7 +19,7 @@ export default function SubmitTicketPage() {
   } = useSubmitTicket();
 
   const content = hasSubmitted ? (
-    <TicketSuccessState description={formData.description} email={formData.email} onSubmitAnother={handleMakeAnotherTicket} ticketNumber={ticketNumber} />
+    <TicketSuccessState description={formData.description} email={formData.email} onSubmitAnother={handleMakeAnotherTicket} />
   ) : (
     <div className="mx-auto max-w-3xl">
       <div className="mb-10 text-center">

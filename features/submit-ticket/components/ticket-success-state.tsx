@@ -3,14 +3,14 @@ import { CheckCircle2, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TicketSuccessStateProps } from "@/features/submit-ticket/types/types";
 
-export function TicketSuccessState({ email, description, ticketNumber, onSubmitAnother }: TicketSuccessStateProps) {
+export function TicketSuccessState({ email, description, onSubmitAnother }: TicketSuccessStateProps) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col items-center rounded-3xl border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-6 text-center shadow-soft md:p-16">
       <div className="mb-6 flex size-24 items-center justify-center rounded-full bg-[var(--palette-off-white)] text-[var(--palette-dark-olive)] shadow-soft">
         <CheckCircle2 aria-hidden="true" className="size-12" />
       </div>
-      <h1 className="font-serif text-3xl font-semibold text-[var(--palette-dark-olive)] md:text-4xl">Success! Your ticket has been submitted.</h1>
-      <p className="mt-3 text-lg leading-7 text-[var(--palette-dark-olive)]">Your ticket number is <span className="font-bold text-[var(--palette-dark-olive)]">{ticketNumber}</span>. A confirmation email has been sent to <span className="font-bold text-[var(--palette-dark-olive)]">{email}</span>.</p>
+      <h1 className="font-serif text-3xl font-semibold text-[var(--palette-dark-olive)] md:text-4xl">Your request has been recorded.</h1>
+      <p className="mt-3 text-lg leading-7 text-[var(--palette-dark-olive)]">Your request for <span className="font-bold text-[var(--palette-dark-olive)]">{email}</span> is ready for review.</p>
 
       <div className="mt-10 w-full rounded-xl border border-[var(--palette-stone)]/50 bg-[var(--palette-cream)] p-6 text-left">
         <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--palette-dark-olive)]">Issue Summary</h2>

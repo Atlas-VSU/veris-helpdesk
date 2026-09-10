@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";
-import { submitTicket } from "@/features/submit-ticket/api/submit-ticket";
 import type { TicketFormData } from "@/features/submit-ticket/types/types";
 
 const initialFormData: TicketFormData = {
@@ -21,7 +20,6 @@ export function useSubmitTicket() {
   const [fileName, setFileName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [ticketNumber, setTicketNumber] = useState("");
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
@@ -41,25 +39,16 @@ export function useSubmitTicket() {
     setFileName(event.target.files?.[0]?.name ?? "");
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
-
-    try {
-      const submittedTicketNumber = await submitTicket(formData);
-      setTicketNumber(submittedTicketNumber);
-      setHasSubmitted(true);
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to submit ticket");
-    } finally {
-      setIsSubmitting(false);
-    }
+    setHasSubmitted(true);
+    setIsSubmitting(false);
   }
 
   function handleMakeAnotherTicket() {
     setFormData(initialFormData);
     setFileName("");
-    setTicketNumber("");
     setHasSubmitted(false);
   }
 
@@ -68,7 +57,6 @@ export function useSubmitTicket() {
     fileName,
     isSubmitting,
     hasSubmitted,
-    ticketNumber,
     handleInputChange,
     handleSelectChange,
     handleConsentChange,

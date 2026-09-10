@@ -35,7 +35,6 @@ export type TicketFormProps = {
 export type TicketSuccessStateProps = {
   email: string;
   description: string;
-  ticketNumber: string;
   onSubmitAnother: () => void;
 };
 
