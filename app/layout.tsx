@@ -1,24 +1,17 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist_Mono, Nunito_Sans } from "next/font/google";
+import { Fraunces, Nunito } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+import { Footer } from "@/features/shared/index";
 
-const nunitoSans = Nunito_Sans({
-  variable: "--font-nunito-sans",
+// Brand Sans-Serif Font
+const nunito = Nunito({
+  variable: "--font-nunito",
   subsets: ["latin"],
   display: "swap",
 });
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
-
+// Brand Serif Font (for editorial/special headings)
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
@@ -30,13 +23,25 @@ export const metadata: Metadata = {
   description: "Warm, reliable support from the VERIS team.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="en"
-      className={`${nunitoSans.variable} ${fraunces.variable} ${geistMono.variable} h-full antialiased`}
+      className={cn(
+        "h-full",
+        "antialiased",
+        nunito.variable,
+        fraunces.variable,
+        "font-sans",
+      )}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-screen flex-col bg-background text-foreground font-sans">
+        <div className="flex flex-1 flex-col">{children}</div>
+      </body>
     </html>
   );
 }

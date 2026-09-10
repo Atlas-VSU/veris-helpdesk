@@ -1,5 +1,5 @@
-import ClientNavbar from "@/features/shared/ClientNavbar";
-import Footer from "@/features/shared/Footer";
+import { ClientNavbar, Footer } from "@/features/shared/index";
+
 
 export default function PublicLayout({ children }: LayoutProps<"/">) {
   return (
