@@ -12,6 +12,10 @@ export async function proxy(request: NextRequest) {
       const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
       try {
+        if (!ticketSubmissionRateLimit) {
+          return NextResponse.next();
+        }
+
         const { success, limit, reset, remaining } = await ticketSubmissionRateLimit.limit(ip);
 
         if (!success) {
@@ -52,6 +56,10 @@ export async function proxy(request: NextRequest) {
       const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
       try {
+        if (!otpRateLimit) {
+          return NextResponse.next();
+        }
+
         const { success, limit, reset, remaining } = await otpRateLimit.limit(ip);
 
         if (!success) {
