@@ -1,6 +1,6 @@
 import { House, TicketPlus, Tickets } from "lucide-react";
 
-import type { NavigationItem } from "@/features/types";
+import type { NavigationItem } from "@/features/shared/types";
 
 export const navigationItems: NavigationItem[] = [
   {

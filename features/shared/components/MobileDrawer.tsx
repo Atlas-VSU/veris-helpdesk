@@ -18,28 +18,28 @@ export default function MobileDrawer() {
           <Drawer open={isOpen} onOpenChange={setIsOpen}>
             <DrawerTrigger
               type="button"
-              className="p-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+              className="flex cursor-pointer items-center justify-center rounded-full p-2.5 text-[var(--palette-dark-olive)] transition-colors hover:bg-[var(--palette-sand)] hover:text-[var(--palette-moss)]"
               aria-label="Toggle menu"
             >
               <Menu aria-hidden="true" className="w-5 h-5" />
             </DrawerTrigger>
 
-            <DrawerContent className="[--drawer-inset:0.75rem] rounded-[2.5rem]! border border-border bg-card px-6 pt-2 pb-8 shadow-float max-h-[85vh] after:hidden">
+            <DrawerContent className="[--drawer-inset:0.75rem] max-h-[85vh] rounded-[2.5rem]! border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] px-6 pb-8 pt-2 shadow-float after:hidden">
               <div className="mx-auto w-12 h-1.5 rounded-full bg-muted-foreground/20 mb-5" />
                 <div className="space-y-6">
                 <DrawerHeader className="text-left border-b border-border pb-5 p-0">
                   <DrawerTitle className="flex items-start justify-start gap-3.5 w-full">
                     <Avatar className="w-10 h-10 shrink-0 after:hidden">
                       <AvatarImage src="/veris-icon.png" alt="VERIS logo" />
-                      <AvatarFallback className="bg-primary text-primary-foreground font-serif font-bold text-sm">
+                      <AvatarFallback className="bg-[var(--palette-moss)] text-[var(--palette-off-white)] text-sm font-bold font-serif">
                         V
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col gap-1.5 items-start">
-                      <span className="font-bold text-foreground text-base font-serif leading-none">
+                      <span className="text-base font-bold leading-none text-[var(--palette-charcoal-olive)] font-serif">
                         VERIS
                       </span>
-                      <span className="text-[10px] font-bold text-primary tracking-wider uppercase bg-muted px-2 py-0.5 rounded-full w-fit leading-none">
+                      <span className="w-fit rounded-full bg-[var(--palette-moss)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--palette-moss)] leading-none">
                         Helpdesk
                       </span>
                     </div>
@@ -58,10 +58,10 @@ export default function MobileDrawer() {
                         aria-current={current ? "page" : undefined}
                         onClick={() => setIsOpen(false)}
                         className={cn(
-                          "flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all relative overflow-hidden group active:scale-98",
+                          "group relative flex items-center gap-3.5 overflow-hidden rounded-xl px-4 py-3 text-sm font-medium transition-all active:scale-98",
                           current
-                            ? "text-primary bg-primary/5 font-semibold"
-                            : "text-foreground hover:bg-muted",
+                            ? "bg-[var(--palette-moss)]/10 font-semibold text-[var(--palette-moss)]"
+                            : "text-[var(--palette-charcoal-olive)] hover:bg-[var(--palette-sand)]",
                         )}
                       >
                         {current && (
@@ -74,10 +74,10 @@ export default function MobileDrawer() {
                         <Icon
                           aria-hidden="true"
                           className={cn(
-                            "w-4 h-4 transition-colors",
+                            "h-4 w-4 transition-colors",
                             current
-                              ? "text-primary"
-                              : "text-muted-foreground group-hover:text-foreground",
+                              ? "text-[var(--palette-moss)]"
+                              : "text-[var(--palette-dark-olive)] group-hover:text-[var(--palette-moss)]",
                           )}
                         />
                         {item.label}
@@ -87,19 +87,17 @@ export default function MobileDrawer() {
                 </nav>
                 </div>
 
-              <div className="pt-4 border-t border-border mt-6">
-                <Link
-                  href="/admin/login"
-                  onClick={() => setIsOpen(false)}
-                  style={{ borderRadius: "9999px" }}
-                  className="flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-[9999px] bg-secondary px-5 text-xs font-semibold text-secondary-foreground shadow-soft transition-all hover:bg-secondary/90 active:scale-95"
-                >
-                  <LogIn
-                    aria-hidden="true"
-                    className="w-4 h-4"
-                  />
-                  Admin Login
-                </Link>
+              <div className="mt-6 border-t border-[var(--palette-stone)] pt-4">
+                <div className="mx-auto w-[calc(100%-1.5rem)] max-w-[16rem]">
+                  <Link
+                    href="/admin/login"
+                    onClick={() => setIsOpen(false)}
+                    className="flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-[var(--palette-terracotta)] px-5 text-sm font-semibold text-[var(--palette-charcoal-olive)] shadow-[0_12px_28px_rgba(193,140,93,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--palette-terracotta)]/90 active:translate-y-0"
+                  >
+                    <LogIn aria-hidden="true" className="h-4 w-4" />
+                    Admin Login
+                  </Link>
+                </div>
               </div>
             </DrawerContent>
           </Drawer>
