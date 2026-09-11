@@ -42,30 +42,32 @@
   --palette-coral: #a85448;
 
   /* Help-desk semantic mappings */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --background: var(--palette-cream);
+  --foreground: var(--palette-charcoal-olive);
+  --card: var(--palette-warm-white);
+  --card-foreground: var(--palette-charcoal-olive);
+  --popover: var(--palette-warm-white);
+  --popover-foreground: var(--palette-charcoal-olive);
+  --primary: var(--palette-moss);
+  --primary-foreground: var(--palette-off-white);
+  --secondary: var(--palette-terracotta);
+  --secondary-foreground: var(--palette-charcoal-olive);
+  --accent: var(--palette-clay);
+  --accent-foreground: var(--palette-dark-olive);
+  --muted: var(--palette-sand);
+  --muted-foreground: var(--palette-dark-olive);
+  --border: var(--palette-stone);
+  --input: var(--palette-gray-olive);
+  --ring: var(--palette-moss);
+  --destructive: var(--palette-coral);
   --destructive-foreground: var(--palette-white);
-  --success: var(--primary);
-  --success-foreground: var(--primary-foreground);
-  --success-muted: var(--muted);
-  --warning: var(--secondary);
-  --warning-foreground: var(--foreground);
-  --warning-muted: var(--muted);
-  --link: var(--primary);
+  --success: var(--palette-moss);
+  --success-foreground: var(--palette-off-white);
+  --success-muted: var(--palette-sand);
+  --warning: var(--palette-terracotta);
+  --warning-foreground: var(--palette-charcoal-olive);
+  --warning-muted: var(--palette-sand);
+  --link: var(--palette-moss);
 
   --status-open: var(--accent);
   --status-open-foreground: var(--foreground);
@@ -120,26 +122,25 @@
   --duration-fast: 120ms;
   --duration-normal: 180ms;
   --duration-slow: 300ms;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --chart-1: var(--palette-moss);
+  --chart-2: var(--palette-dark-olive);
+  --chart-3: var(--palette-gray-olive);
+  --chart-4: var(--palette-terracotta);
+  --chart-5: var(--palette-charcoal-olive);
+  --sidebar: var(--palette-cream);
+  --sidebar-foreground: var(--palette-charcoal-olive);
+  --sidebar-primary: var(--palette-moss);
+  --sidebar-primary-foreground: var(--palette-off-white);
+  --sidebar-accent: var(--palette-clay);
+  --sidebar-accent-foreground: var(--palette-dark-olive);
+  --sidebar-border: var(--palette-stone);
+  --sidebar-ring: var(--palette-moss);
 }
 
 /* Static keeps these tokens available even before utilities are used. */
 @theme static {
-  --font-sans: var(--font-nunito-sans), system-ui, sans-serif;
+  --font-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-nunito-sans: var(--font-nunito), system-ui, sans-serif;
   --font-serif: var(--font-fraunces), Georgia, serif;
   --font-mono: ui-monospace, Consolas, monospace;
   --text-xs: 0.75rem;
@@ -237,7 +238,8 @@
   --spacing-control: var(--control-height);
   --spacing-ticket-row: var(--ticket-row-height);
   --font-heading: var(--font-fraunces), Georgia, serif;
-  --font-sans: var(--font-nunito-sans), system-ui, sans-serif;
+  --font-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-nunito-sans: var(--font-nunito), system-ui, sans-serif;
   --font-serif: var(--font-fraunces), Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
