@@ -9,13 +9,15 @@ import { adminLoginSchema } from "@/features/admin/schemas/admin";
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
 
-  const { success } = await loginRateLimit.limit(ip);
+  if (loginRateLimit) {
+    const { success } = await loginRateLimit.limit(ip);
 
-  if (!success) {
-    return NextResponse.json(
-      { error: "Too many login attempts. Please try again later" },
-      { status: 429 },
-    );
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later" },
+        { status: 429 },
+      );
+    }
   }
   let body: unknown;
 

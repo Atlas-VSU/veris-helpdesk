@@ -4,31 +4,30 @@ import { Ratelimit } from "@upstash/ratelimit";
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-if (!upstashUrl || !upstashToken) {
-  throw new Error(
-    "Missing required env vars: UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN",
-  );
-}
+const redis = upstashUrl && upstashToken
+  ? new Redis({ url: upstashUrl, token: upstashToken })
+  : null;
 
-const redis = new Redis({
-  url: upstashUrl,
-  token: upstashToken,
-});
+export const loginRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, "60 s"),
+      prefix: "ratelimit:login",
+    })
+  : null;
 
-export const loginRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "60 s"),
-  prefix: "ratelimit:login",
-});
+export const ticketSubmissionRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, "1 h"),
+      prefix: "ratelimit:ticket",
+    })
+  : null;
 
-export const ticketSubmissionRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "1 h"),
-  prefix: "ratelimit:ticket",
-});
-
-export const otpRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "5 m"),
-  prefix: "ratelimit:otp",
-});
+export const otpRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, "5 m"),
+      prefix: "ratelimit:otp",
+    })
+  : null;
