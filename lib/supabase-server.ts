@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import { Database } from "@/types/supabase";
 
-let supabaseServerClient: ReturnType<typeof createClient> | null = null;
+let supabaseServerClient: ReturnType<typeof createClient<Database>> | null = null;
 
 export function getSupabaseServerClient() {
   if (supabaseServerClient) {
@@ -16,6 +17,19 @@ export function getSupabaseServerClient() {
     );
   }
 
-  supabaseServerClient = createClient(supabaseUrl, supabaseSecretKey);
+  supabaseServerClient = createClient<Database>(supabaseUrl, supabaseSecretKey);
   return supabaseServerClient;
+}
+
+export async function getAttachmentSignedUrl(storagePath: string, expiresIn = 3600) {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.storage
+    .from("attachments")
+    .createSignedUrl(storagePath, expiresIn);
+
+  if (error) {
+    throw new Error(`Failed to generate signed URL: ${error.message}`);
+  }
+
+  return data.signedUrl;
 }
