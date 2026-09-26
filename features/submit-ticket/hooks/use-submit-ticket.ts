@@ -23,6 +23,7 @@ export function useSubmitTicket() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ticketNumber, setTicketNumber] = useState<string | null>(null);
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
@@ -54,6 +55,7 @@ export function useSubmitTicket() {
       if (result.error) {
         setError(result.error);
       } else {
+        setTicketNumber(result.ticketNumber ?? null);
         setHasSubmitted(true);
       }
     } catch (err) {
@@ -69,6 +71,8 @@ export function useSubmitTicket() {
     setFormData(initialFormData);
     setFileName("");
     setHasSubmitted(false);
+    setError(null);
+    setTicketNumber(null);
   }
 
   return {
@@ -77,6 +81,7 @@ export function useSubmitTicket() {
     isSubmitting,
     hasSubmitted,
     error,
+    ticketNumber,
     handleInputChange,
     handleSelectChange,
     handleConsentChange,

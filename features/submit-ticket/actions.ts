@@ -1,38 +1,56 @@
 "use server";
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { TicketFormData } from "./types/types";
+import { createTicketSchema } from "@/features/tickets/schemas/ticket";
 
 export async function submitTicketAction(formData: FormData) {
   const supabase = getSupabaseServerClient();
 
-  // Extract text fields
-  const fullName = formData.get("fullName") as string;
-  const email = formData.get("email") as string;
-  const userType = formData.get("userType") as "subscriber" | "student";
-  const service = formData.get("service") as string;
-  const subject = formData.get("subject") as string;
-  const description = formData.get("description") as string;
-  const priority = formData.get("priority") as "low" | "medium" | "high" | "urgent";
-  const consentGiven = formData.get("consent") === "on";
+  const rawData = {
+    full_name: formData.get("fullName") as string,
+    email: formData.get("email") as string,
+    user_type: formData.get("userType") as string,
+    service: formData.get("service") as string,
+    subject: formData.get("subject") as string,
+    description: formData.get("description") as string,
+    priority: formData.get("priority") as string,
+    consent_given: formData.get("consent") === "on",
+  };
 
-  // Validate required fields (basic validation)
-  if (!fullName || !email || !service || !subject || !description) {
-    return { error: "Missing required fields." };
+  // 1. Validate ticket fields (Zod)
+  const parsed = createTicketSchema.safeParse(rawData);
+  if (!parsed.success) {
+    return { error: parsed.error.errors[0]?.message || "Invalid ticket data." };
+  }
+  const ticketDataParsed = parsed.data;
+
+  // 2. Validate file (size and type)
+  const file = formData.get("attachment") as File | null;
+  const hasFile = file && file.size > 0;
+  
+  if (hasFile) {
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      return { error: "File size exceeds 10MB limit." };
+    }
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+      return { error: "File type not allowed. Please upload an image or PDF." };
+    }
   }
 
-  // 1. Insert ticket
+  // 3. Insert ticket to database
   const { data: ticketData, error: ticketError } = await supabase
     .from("tickets")
     .insert({
-      full_name: fullName,
-      email,
-      user_type: userType,
-      service,
-      subject,
-      description,
-      priority,
-      consent_given: consentGiven,
+      full_name: ticketDataParsed.full_name,
+      email: ticketDataParsed.email,
+      user_type: ticketDataParsed.user_type,
+      service: ticketDataParsed.service,
+      subject: ticketDataParsed.subject,
+      description: ticketDataParsed.description,
+      priority: ticketDataParsed.priority,
+      consent_given: ticketDataParsed.consent_given,
       status: "new",
       ticket_number: "PENDING", // Overwritten by database trigger
     })
@@ -47,21 +65,11 @@ export async function submitTicketAction(formData: FormData) {
   const ticketId = ticketData.id;
   const ticketNumber = ticketData.ticket_number;
 
-  // 2. Handle file upload if present
-  const file = formData.get("attachment") as File | null;
-  
-  if (file && file.size > 0) {
-    // Basic file validation
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-    if (file.size > MAX_FILE_SIZE) {
-      return { error: "File size exceeds 5MB limit." };
-    }
-
+  // 4. Upload file to storage
+  if (hasFile) {
     const timestamp = Date.now();
-    // Path structure: ticket_id/timestamp_filename
     const storagePath = `${ticketId}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
 
-    // Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from("attachments")
       .upload(storagePath, file, {
@@ -71,10 +79,14 @@ export async function submitTicketAction(formData: FormData) {
 
     if (uploadError) {
       console.error("Error uploading file:", uploadError);
-      return { error: "Ticket created, but failed to upload attachment." };
+      
+      // Delete the ticket to prevent duplicate tickets on failure
+      await supabase.from("tickets").delete().eq("id", ticketId);
+      
+      return { error: "Failed to upload attachment. Please try again." };
     }
 
-    // Insert attachment record
+    // 5. Insert attachment record
     const { error: attachmentError } = await supabase
       .from("attachments")
       .insert({
@@ -87,7 +99,8 @@ export async function submitTicketAction(formData: FormData) {
 
     if (attachmentError) {
       console.error("Error creating attachment record:", attachmentError);
-      return { error: "Ticket created, but failed to save attachment info." };
+      await supabase.from("tickets").delete().eq("id", ticketId);
+      return { error: "Failed to save attachment info. Please try again." };
     }
   }
 
