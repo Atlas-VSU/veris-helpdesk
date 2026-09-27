@@ -10,6 +10,7 @@ export default function SubmitTicketPage() {
     fileName,
     isSubmitting,
     hasSubmitted,
+    error,
     handleInputChange,
     handleSelectChange,
     handleConsentChange,
@@ -26,6 +27,12 @@ export default function SubmitTicketPage() {
         <h1 className="font-serif text-4xl font-semibold text-[var(--palette-dark-olive)] md:text-5xl">Submit a Request</h1>
         <p className="mt-3 text-lg leading-7 text-[var(--palette-dark-olive)]">We&apos;re here to help. Tell us what you need, and we&apos;ll get back to you shortly.</p>
       </div>
+
+      {error && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-800 border border-red-200">
+          {error}
+        </div>
+      )}
 
       <TicketForm
         formData={formData}

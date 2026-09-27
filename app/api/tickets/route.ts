@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseServerClient();
     const { data, error } = await supabase
       .from("tickets")
-      .insert(result.data)
+      .insert({ ...result.data, ticket_number: "PENDING" })
       .select("ticket_number")
       .single<{ ticket_number: string }>();
 
