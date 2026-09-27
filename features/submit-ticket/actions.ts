@@ -99,6 +99,7 @@ export async function submitTicketAction(formData: FormData) {
 
     if (attachmentError) {
       console.error("Error creating attachment record:", attachmentError);
+      await supabase.storage.from("attachments").remove([storagePath]);
       await supabase.from("tickets").delete().eq("id", ticketId);
       return { error: "Failed to save attachment info. Please try again." };
     }
