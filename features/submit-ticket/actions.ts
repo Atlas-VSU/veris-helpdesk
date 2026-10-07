@@ -20,7 +20,7 @@ export async function submitTicketAction(formData: FormData) {
   // 1. Validate ticket fields (Zod)
   const parsed = createTicketSchema.safeParse(rawData);
   if (!parsed.success) {
-    return { error: parsed.error.errors[0]?.message || "Invalid ticket data." };
+    return { error: parsed.error.issues[0]?.message || "Invalid ticket data." };
   }
   const ticketDataParsed = parsed.data;
 
