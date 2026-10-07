@@ -1,0 +1,2 @@
+## API contract
+Before building or calling any API endpoint, read docs/openapi.yaml. It is the source of truth for URLs, request bodies, response shapes, cookies, and error codes. If the code and the file disagree, tell the team lead.

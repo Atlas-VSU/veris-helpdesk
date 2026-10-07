@@ -1,0 +1,644 @@
+openapi: 3.0.3
+info:
+  title: Veris Helpdesk API
+  version: 1.0.0
+  description: Emails are compared case-insensitively everywhere, including OTP and ticket matching.
+servers:
+  - url: /
+paths:
+  /api/otp/request:
+    post:
+      summary: Request a one-time verification code
+      operationId: requestOtp
+      security: []
+      description: >
+        Always returns the same success response regardless of whether the
+        email has tickets. A code is sent only when the email has at least one
+        ticket. Emails are compared case-insensitively.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpRequest"
+      responses:
+        "200":
+          description: Identical success response for all email addresses.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    enum: ["If this email has tickets, a code was sent."]
+                    example: "If this email has tickets, a code was sent."
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "429":
+          description: >
+            Rate limit exceeded. A resend requested within 60 seconds returns
+            OTP_RESEND_WAIT and retryAfterSeconds; a generic rate limit has no code.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/GenericRateLimitError"
+                  - $ref: "#/components/schemas/OtpResendWaitError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/otp/verify:
+    post:
+      summary: Verify a one-time code and create a client session
+      operationId: verifyOtp
+      security: []
+      description: >
+        Codes contain 6 digits, expire after 10 minutes, allow at most 5 wrong
+        tries, and may be resent every 60 seconds. Successful verification sets
+        the client_session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerify"
+      responses:
+        "200":
+          description: Code verified; sets client_session.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/ClientSessionCookie"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, email]
+                properties:
+                  message:
+                    type: string
+                    enum: [Verified]
+                    example: Verified
+                  email:
+                    type: string
+                    format: email
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          description: >
+            The code is wrong or expired. If no active code exists for the
+            email, return OTP_EXPIRED (same as an expired code), so the
+            response never reveals whether an email has tickets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpVerifyError"
+              examples:
+                wrongCode:
+                  summary: The code is wrong
+                  value:
+                    error: "That code is not correct."
+                    code: OTP_WRONG
+                expiredCode:
+                  summary: The code expired after 10 minutes
+                  value:
+                    error: "That code has expired. Please request a new one."
+                    code: OTP_EXPIRED
+        "429":
+          description: >
+            Either five wrong tries were used and the user must request a new
+            code, or a generic rate limit was exceeded.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/OtpLockedError"
+                  - $ref: "#/components/schemas/GenericRateLimitError"
+              examples:
+                locked:
+                  summary: Five wrong tries used; request a new code
+                  value:
+                    error: "Too many wrong tries. Please request a new code."
+                    code: OTP_LOCKED
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/tickets:
+    get:
+      summary: List the authenticated client's tickets
+      operationId: listMyTickets
+      security:
+        - clientSession: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive match against subject and ticket_number.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Client tickets sorted newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ticket"
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/tickets/{ticketNumber}:
+    get:
+      summary: Get a client ticket and its conversation
+      operationId: getMyTicket
+      description: >
+        The ticket's email must match the email in the client session,
+        compared case-insensitively. A ticket belonging to another email
+        returns 404, never 403. Messages are sorted oldest first; attachments
+        are listed under the ticket.
+      security:
+        - clientSession: []
+      parameters:
+        - $ref: "#/components/parameters/TicketNumber"
+      responses:
+        "200":
+          description: Ticket, messages, and attachments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/Ticket"
+                      - type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Message"
+                          attachments:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Attachment"
+        "404":
+          description: Ticket not found, including when it belongs to a different email.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketNotFoundError"
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/admin/login:
+    post:
+      summary: Log in an administrator
+      operationId: adminLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLogin"
+      responses:
+        "200":
+          description: Login successful; sets the admin_session cookie.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/AdminSessionCookie"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, admin]
+                properties:
+                  message:
+                    type: string
+                    example: Login successful
+                  admin:
+                    $ref: "#/components/schemas/Admin"
+        "400":
+          description: Invalid JSON body or invalid login fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many login attempts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/logout:
+    post:
+      summary: Log out an administrator
+      operationId: adminLogout
+      security: []
+      description: Always returns 200 and clears admin_session, even if the session is expired or missing.
+      responses:
+        "200":
+          description: Clears the admin_session cookie.
+          headers:
+            Set-Cookie:
+              description: Clears the admin_session cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    enum: ["Logged out"]
+                    example: Logged out
+  /api/admin/tickets:
+    get:
+      summary: List tickets for administrators
+      operationId: adminListTickets
+      description: >
+        Results are sorted newest first. The q parameter matches subject and
+        ticket_number case-insensitively. page defaults to 1 and pageSize
+        defaults to 10; pageSize has a maximum of 50. Out-of-range values
+        return 400.
+      security:
+        - adminSession: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive match against subject and ticket_number.
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Paginated tickets sorted newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, page, pageSize, total]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ticket"
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  total:
+                    type: integer
+        "400":
+          description: Invalid filters or out-of-range page/pageSize.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/admin/tickets/{ticketNumber}:
+    patch:
+      summary: Update a ticket's status and/or priority
+      operationId: adminUpdateTicket
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: "#/components/parameters/TicketNumber"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketUpdate"
+      responses:
+        "200":
+          description: Ticket updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ticket"
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/TicketNotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: admin_session
+      description: >
+        Administrator JWT cookie. Protected admin endpoints require a token
+        with an adminId payload. Client tokens with role: client must be rejected.
+    clientSession:
+      type: apiKey
+      in: cookie
+      name: client_session
+      description: >
+        Client JWT cookie; payload is { email, role: "client" }. Admin endpoints
+        require an admin token with adminId; client tokens must be rejected.
+  headers:
+    AdminSessionCookie:
+      description: >
+        JWT cookie named admin_session; httpOnly, sameSite=lax, max-age 86400
+        seconds, path=/, secure in production.
+      schema:
+        type: string
+    ClientSessionCookie:
+      description: >
+        JWT cookie named client_session; httpOnly, secure in production,
+        sameSite=lax, valid for 2 hours.
+      schema:
+        type: string
+  parameters:
+    TicketNumber:
+      name: ticketNumber
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^TCK-[0-9]{4}-[0-9]{5}$"
+        example: TCK-2026-00001
+  responses:
+    BadInput:
+      description: Bad input.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or invalid authentication, or access not verified.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TicketNotFound:
+      description: Ticket not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TicketNotFoundError"
+    ServerError:
+      description: Server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+    GenericRateLimitError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+    OtpResendWaitError:
+      type: object
+      required: [error, code, retryAfterSeconds]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [OTP_RESEND_WAIT]
+        retryAfterSeconds:
+          type: integer
+    OtpVerifyError:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [OTP_WRONG, OTP_EXPIRED]
+          example: OTP_WRONG
+    OtpLockedError:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [OTP_LOCKED]
+          example: OTP_LOCKED
+    TicketNotFoundError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: ["Ticket not found"]
+          example: Ticket not found
+    OtpRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    OtpVerify:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+          minLength: 6
+          maxLength: 6
+    AdminLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+    Admin:
+      type: object
+      required: [id, email, full_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+    TicketStatus:
+      type: string
+      enum:
+        - new
+        - open
+        - in_progress
+        - waiting_for_client
+        - resolved
+        - closed
+    Priority:
+      type: string
+      enum:
+        - low
+        - medium
+        - high
+        - urgent
+    UserType:
+      type: string
+      enum:
+        - subscriber
+        - student
+    Ticket:
+      type: object
+      required:
+        - id
+        - ticket_number
+        - full_name
+        - email
+        - user_type
+        - service
+        - subject
+        - description
+        - priority
+        - status
+        - consent_given
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_number:
+          type: string
+          pattern: "^TCK-[0-9]{4}-[0-9]{5}$"
+          example: TCK-2026-00001
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+        user_type:
+          $ref: "#/components/schemas/UserType"
+        service:
+          type: string
+        subject:
+          type: string
+        description:
+          type: string
+        priority:
+          $ref: "#/components/schemas/Priority"
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        consent_given:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Message:
+      type: object
+      required: [sender_type, body, created_at]
+      properties:
+        sender_type:
+          type: string
+          enum: [client, admin]
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Attachment:
+      type: object
+      required: [file_name, file_type, file_size]
+      properties:
+        file_name:
+          type: string
+        file_type:
+          type: string
+        file_size:
+          type: integer
+    TicketUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        priority:
+          $ref: "#/components/schemas/Priority"
