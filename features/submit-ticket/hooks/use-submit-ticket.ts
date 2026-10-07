@@ -3,6 +3,8 @@
 import { ChangeEvent, FormEvent, useState } from "react";
 import type { TicketFormData } from "@/features/submit-ticket/types/types";
 
+import { submitTicketAction } from "../actions";
+
 const initialFormData: TicketFormData = {
   fullName: "",
   email: "",
@@ -20,6 +22,8 @@ export function useSubmitTicket() {
   const [fileName, setFileName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ticketNumber, setTicketNumber] = useState<string | null>(null);
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
@@ -39,17 +43,36 @@ export function useSubmitTicket() {
     setFileName(event.target.files?.[0]?.name ?? "");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
-    setHasSubmitted(true);
-    setIsSubmitting(false);
+    setError(null);
+
+    try {
+      const formDataObj = new FormData(event.currentTarget);
+      const result = await submitTicketAction(formDataObj);
+      
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setTicketNumber(result.ticketNumber ?? null);
+        setHasSubmitted(true);
+      }
+    } catch (err) {
+      console.error("Submission error:", err);
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
 
   function handleMakeAnotherTicket() {
     setFormData(initialFormData);
     setFileName("");
     setHasSubmitted(false);
+    setError(null);
+    setTicketNumber(null);
   }
 
   return {
@@ -57,6 +80,8 @@ export function useSubmitTicket() {
     fileName,
     isSubmitting,
     hasSubmitted,
+    error,
+    ticketNumber,
     handleInputChange,
     handleSelectChange,
     handleConsentChange,
