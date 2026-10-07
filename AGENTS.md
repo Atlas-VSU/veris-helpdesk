@@ -7,3 +7,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## API contract
+Before building or calling any API endpoint, read docs/openapi.yaml. It is the source of truth for URLs, request bodies, response shapes, cookies, and error codes. If the code and the file disagree, tell the team lead.
