@@ -6,6 +6,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 interface UsePaginationOptions {
+    initialPage?: number;
     page?: number;
     pageSize?: number;
     total?: number;
@@ -16,19 +17,25 @@ interface UsePaginationReturn {
     page: number;
     totalPages: number;
     handlePageChange: (page: number) => void;
+    resetPage: () => void;
+    setPage: React.Dispatch<React.SetStateAction<number>>;
     pageNumbers: (number | "…")[];
     from: number;
     to: number;
 }
 
 export function usePagination({
-    page = 1,
+    initialPage = 1,
+    page: controlledPage,
     pageSize = 10,
     total = 0,
     onPageChange,
 }: UsePaginationOptions = {}): UsePaginationReturn {
+    const [internalPage, setInternalPage] = useState(initialPage);
+    const page = controlledPage ?? internalPage;
+
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const from = Math.min((page - 1) * pageSize + 1, total);
+    const from = total === 0 ? 0 : Math.min((page - 1) * pageSize + 1, total);
     const to = Math.min(page * pageSize, total);
 
     /** Build the page number list with ellipsis: [1, …, 4, 5, 6, …, 12] */
@@ -50,16 +57,25 @@ export function usePagination({
     const handlePageChange = useCallback(
         (newPage: number) => {
             const clampedPage = Math.max(1, Math.min(newPage, totalPages));
+            setInternalPage(clampedPage);
             onPageChange?.(clampedPage);
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            if (typeof window !== "undefined") {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            }
         },
         [totalPages, onPageChange]
     );
+
+    const resetPage = useCallback(() => {
+        setInternalPage(1);
+    }, []);
 
     return {
         page,
         totalPages,
         handlePageChange,
+        resetPage,
+        setPage: setInternalPage,
         pageNumbers,
         from,
         to,

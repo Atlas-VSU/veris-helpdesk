@@ -25,13 +25,9 @@ import {
   type FilterState,
 } from "../constants";
 
-type Props = {
-  filters: FilterState;
-  onChange: (next: Partial<FilterState>) => void;
-  onClear: () => void;
-};
+import type { TicketFiltersBarProps } from "../types/props";
 
-export function TicketFiltersBar({ filters, onChange, onClear }: Props) {
+export function TicketFiltersBar({ filters, onChange, onClear }: TicketFiltersBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -58,7 +54,7 @@ export function TicketFiltersBar({ filters, onChange, onClear }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         {/* Status filter */}
         <Select
-          value={filters.status || ALL_VALUE}
+          value={filters.status || null}
           onValueChange={(v: string | null) =>
             onChange({ status: !v || v === ALL_VALUE ? "" : (v as TicketStatus) })
           }
@@ -68,10 +64,10 @@ export function TicketFiltersBar({ filters, onChange, onClear }: Props) {
             aria-label="Filter by status"
             className={cn(
               "h-9 min-w-[130px] bg-card text-sm",
-              filters.status && "border-primary text-primary"
+              filters.status && "border-primary text-primary font-medium"
             )}
           >
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_VALUE}>All statuses</SelectItem>
@@ -85,7 +81,7 @@ export function TicketFiltersBar({ filters, onChange, onClear }: Props) {
 
         {/* Priority filter */}
         <Select
-          value={filters.priority || ALL_VALUE}
+          value={filters.priority || null}
           onValueChange={(v: string | null) =>
             onChange({ priority: !v || v === ALL_VALUE ? "" : (v as TicketPriority) })
           }
@@ -95,10 +91,10 @@ export function TicketFiltersBar({ filters, onChange, onClear }: Props) {
             aria-label="Filter by priority"
             className={cn(
               "h-9 min-w-[130px] bg-card text-sm",
-              filters.priority && "border-primary text-primary"
+              filters.priority && "border-primary text-primary font-medium"
             )}
           >
-            <SelectValue placeholder="Priority" />
+            <SelectValue placeholder="All priorities" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_VALUE}>All priorities</SelectItem>

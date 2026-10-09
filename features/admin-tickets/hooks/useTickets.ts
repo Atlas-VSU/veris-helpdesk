@@ -5,7 +5,7 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { fetchAdminTickets } from "../services/api";
-import { MOCK_TICKETS, MOCK_TOTAL } from "../services/mock";
+import { getMockTickets, MOCK_TICKETS, MOCK_TOTAL } from "../services/mock";
 import type { Ticket, AdminTicketsQuery } from "../types";
 
 interface UseTicketsOptions {
@@ -42,9 +42,10 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
                     setTotal(res.total);
                     setError(null);
                 } catch {
-                    // Fall back to mock data so the UI is always useful in development
-                    setTickets(MOCK_TICKETS);
-                    setTotal(MOCK_TOTAL);
+                    // Fall back to filtered mock data so the UI is always useful in development
+                    const mockRes = getMockTickets({ ...query, pageSize });
+                    setTickets(mockRes.data);
+                    setTotal(mockRes.total);
                     setError(null);
                 }
             });

@@ -1,26 +1,26 @@
 // features/admin-tickets/components/TicketPagination.tsx
-// Page controls aligned with the API: page (1-based), pageSize, total.
+// Page controls aligned with the API: page (1-based), pageSize, total using shadcn pagination.
 
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { usePagination } from "../hooks/usePagination";
-
-type Props = {
-  page: number;
-  pageSize: number;
-  total: number;
-  onPageChange: (page: number) => void;
-};
+import type { TicketPaginationProps } from "../types/props";
 
 export function TicketPagination({
   page,
   pageSize,
   total,
   onPageChange,
-}: Props) {
+}: TicketPaginationProps) {
   const {
     totalPages,
     from,
@@ -28,6 +28,10 @@ export function TicketPagination({
     pageNumbers,
     handlePageChange,
   } = usePagination({ page, pageSize, total, onPageChange });
+
+  if (total === 0) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col items-center justify-between gap-3 pt-4 sm:flex-row">
@@ -42,57 +46,56 @@ export function TicketPagination({
         {" results"}
       </p>
 
-      {/* Controls */}
-      <nav aria-label="Pagination" className="flex items-center gap-1">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => handlePageChange(page - 1)}
-          disabled={page <= 1}
-          aria-label="Previous page"
-          className="size-8"
-        >
-          <ChevronLeft className="size-4" />
-        </Button>
+      {/* Shadcn Pagination Controls */}
+      <Pagination className="w-auto mx-0">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (page > 1) handlePageChange(page - 1);
+              }}
+              className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              aria-disabled={page <= 1}
+            />
+          </PaginationItem>
 
-        {pageNumbers.map((p, i) =>
-          p === "…" ? (
-            <span
-              key={`ellipsis-${i}`}
-              className="flex size-8 items-center justify-center text-sm text-muted-foreground select-none"
-              aria-hidden="true"
-            >
-              …
-            </span>
-          ) : (
-            <Button
-              key={p}
-              variant={p === page ? "default" : "outline"}
-              size="icon"
-              onClick={() => handlePageChange(p)}
-              aria-label={`Page ${p}`}
-              aria-current={p === page ? "page" : undefined}
-              className={cn(
-                "size-8 text-sm",
-                p === page && "bg-primary text-primary-foreground hover:bg-primary/90"
-              )}
-            >
-              {p}
-            </Button>
-          )
-        )}
+          {pageNumbers.map((p, i) =>
+            p === "…" ? (
+              <PaginationItem key={`ellipsis-${i}`}>
+                <PaginationEllipsis />
+              </PaginationItem>
+            ) : (
+              <PaginationItem key={p}>
+                <PaginationLink
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handlePageChange(p);
+                  }}
+                  isActive={p === page}
+                  className="cursor-pointer"
+                >
+                  {p}
+                </PaginationLink>
+              </PaginationItem>
+            )
+          )}
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => handlePageChange(page + 1)}
-          disabled={page >= totalPages}
-          aria-label="Next page"
-          className="size-8"
-        >
-          <ChevronRight className="size-4" />
-        </Button>
-      </nav>
+          <PaginationItem>
+            <PaginationNext
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (page < totalPages) handlePageChange(page + 1);
+              }}
+              className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              aria-disabled={page >= totalPages}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
   );
 }

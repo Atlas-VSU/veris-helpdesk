@@ -16,27 +16,34 @@ import { useFilters } from "../hooks/useFilters";
 import { usePagination } from "../hooks/usePagination";
 import { DEFAULT_FILTERS, PAGE_SIZE } from "../constants";
 import type { FilterState } from "../constants";
-import type { Ticket } from "../types";
 
 export function TicketsView() {
   const { tickets, total, isLoading, error, fetchTickets } = useTickets({
     pageSize: PAGE_SIZE,
   });
-  const { filters, handleFilterChange, handleClear } = useFilters(DEFAULT_FILTERS);
-  const { page, handlePageChange } = usePagination({
-    page: 1,
+  const { filters, handleFilterChange, handleClear: handleClearFilters } = useFilters(DEFAULT_FILTERS);
+  const { page, handlePageChange, resetPage } = usePagination({
+    initialPage: 1,
     pageSize: PAGE_SIZE,
     total,
-    onPageChange: (newPage: number) => {
-      // The hook handles the page change internally
-    },
   });
+
+  const onFilterChange = (next: Partial<FilterState>) => {
+    handleFilterChange(next);
+    resetPage();
+  };
+
+  const onClearFilters = () => {
+    handleClearFilters();
+    resetPage();
+  };
 
   // Fetch tickets when filters or page changes
   useEffect(() => {
     fetchTickets({
       q: filters.q || undefined,
       status: filters.status || undefined,
+      priority: filters.priority || undefined,
       page,
       pageSize: PAGE_SIZE,
     });
@@ -72,8 +79,8 @@ export function TicketsView() {
         <div className="mt-4">
           <TicketFiltersBar
             filters={filters}
-            onChange={handleFilterChange}
-            onClear={handleClear}
+            onChange={onFilterChange}
+            onClear={onClearFilters}
           />
         </div>
       </header>

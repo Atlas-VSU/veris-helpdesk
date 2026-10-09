@@ -102,4 +102,41 @@ export const MOCK_TICKETS: Ticket[] = [
     },
 ];
 
-export const MOCK_TOTAL = 124;
+export const MOCK_TOTAL = MOCK_TICKETS.length;
+
+import type { AdminTicketsQuery, AdminTicketsResponse } from "../types";
+
+/** Helper to filter and paginate mock tickets for offline development */
+export function getMockTickets(query: AdminTicketsQuery = {}): AdminTicketsResponse {
+    let filtered = [...MOCK_TICKETS];
+
+    if (query.status) {
+        filtered = filtered.filter((t) => t.status === query.status);
+    }
+    if (query.priority) {
+        filtered = filtered.filter((t) => t.priority === query.priority);
+    }
+    if (query.q) {
+        const q = query.q.toLowerCase();
+        filtered = filtered.filter(
+            (t) =>
+                t.ticket_number.toLowerCase().includes(q) ||
+                t.subject.toLowerCase().includes(q) ||
+                t.full_name.toLowerCase().includes(q) ||
+                t.email.toLowerCase().includes(q)
+        );
+    }
+
+    const total = filtered.length;
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const start = (page - 1) * pageSize;
+    const data = filtered.slice(start, start + pageSize);
+
+    return {
+        data,
+        page,
+        pageSize,
+        total,
+    };
+}

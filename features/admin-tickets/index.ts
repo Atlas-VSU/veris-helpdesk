@@ -19,7 +19,7 @@ export { usePagination } from "./hooks/usePagination";
 
 // Services
 export { fetchAdminTickets } from "./services/api";
-export { MOCK_TICKETS, MOCK_TOTAL } from "./services/mock";
+export { MOCK_TICKETS, MOCK_TOTAL, getMockTickets } from "./services/mock";
 
 // Constants
 export {
@@ -35,14 +35,12 @@ export {
 export {
     STATUS_CONFIG,
     PRIORITY_CONFIG,
-    type StatusBadgeProps,
-    type PriorityBadgeProps,
 } from "./constants/badges";
 
 // Utils
 export { initials, formatRelativeTime, formatFullDate } from "./utils/format";
 
-// Types
+// Types & Component Props
 export type {
     AdminTicketsQuery,
     AdminTicketsResponse,
@@ -50,3 +48,5 @@ export type {
     TicketStatus,
     TicketPriority,
 } from "./types";
+
+export * from "./types/props";
