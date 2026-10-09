@@ -5,71 +5,42 @@
 
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useEffect } from "react";
 import { Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TicketFiltersBar, type FilterState } from "./TicketFiltersBar";
+import { TicketFiltersBar } from "./TicketFiltersBar";
 import { TicketTable } from "./TicketTable";
 import { TicketPagination } from "./TicketPagination";
-import { fetchAdminTickets } from "../data";
-import { MOCK_TICKETS, MOCK_TOTAL } from "../mock";
+import { useTickets } from "../hooks/useTickets";
+import { useFilters } from "../hooks/useFilters";
+import { usePagination } from "../hooks/usePagination";
+import { DEFAULT_FILTERS, PAGE_SIZE } from "../constants";
+import type { FilterState } from "../constants";
 import type { Ticket } from "../types";
 
-const DEFAULT_FILTERS: FilterState = { q: "", status: "", priority: "" };
-const PAGE_SIZE = 10;
-
-type ViewData = { tickets: Ticket[]; total: number };
-
 export function TicketsView() {
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<ViewData>({
-    tickets: MOCK_TICKETS,
-    total: MOCK_TOTAL,
+  const { tickets, total, isLoading, error, fetchTickets } = useTickets({
+    pageSize: PAGE_SIZE,
   });
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const load = useCallback(
-    (f: FilterState, p: number) => {
-      startTransition(async () => {
-        try {
-          const res = await fetchAdminTickets({
-            q: f.q || undefined,
-            status: f.status || undefined,
-            page: p,
-            pageSize: PAGE_SIZE,
-          });
-          setData({ tickets: res.data, total: res.total });
-          setError(null);
-        } catch {
-          // Fall back to mock data so the UI is always useful in development
-          setData({ tickets: MOCK_TICKETS, total: MOCK_TOTAL });
-          setError(null);
-        }
-      });
+  const { filters, handleFilterChange, handleClear } = useFilters(DEFAULT_FILTERS);
+  const { page, handlePageChange } = usePagination({
+    page: 1,
+    pageSize: PAGE_SIZE,
+    total,
+    onPageChange: (newPage: number) => {
+      // The hook handles the page change internally
     },
-    []
-  );
+  });
 
+  // Fetch tickets when filters or page changes
   useEffect(() => {
-    load(filters, page);
-  }, [filters, page, load]);
-
-  const handleFilterChange = useCallback((next: Partial<FilterState>) => {
-    setFilters((prev) => ({ ...prev, ...next }));
-    setPage(1);
-  }, []);
-
-  const handleClear = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
-    setPage(1);
-  }, []);
-
-  const handlePageChange = useCallback((p: number) => {
-    setPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+    fetchTickets({
+      q: filters.q || undefined,
+      status: filters.status || undefined,
+      page,
+      pageSize: PAGE_SIZE,
+    });
+  }, [filters, page, fetchTickets]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -111,7 +82,7 @@ export function TicketsView() {
       <main
         id="tickets-list"
         className="flex-1 overflow-y-auto px-6 md:px-12 py-6"
-        aria-busy={isPending}
+        aria-busy={isLoading}
         aria-label="Ticket list"
       >
         {error && (
@@ -125,17 +96,17 @@ export function TicketsView() {
 
         <div
           className={
-            isPending ? "opacity-60 pointer-events-none transition-opacity duration-normal" : ""
+            isLoading ? "opacity-60 pointer-events-none transition-opacity duration-normal" : ""
           }
         >
-          <TicketTable tickets={data.tickets} />
+          <TicketTable tickets={tickets} />
         </div>
 
         <div className="mt-6 pb-8">
           <TicketPagination
             page={page}
             pageSize={PAGE_SIZE}
-            total={data.total}
+            total={total}
             onPageChange={handlePageChange}
           />
         </div>

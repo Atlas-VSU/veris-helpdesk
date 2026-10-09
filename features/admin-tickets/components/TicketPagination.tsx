@@ -6,6 +6,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { usePagination } from "../hooks/usePagination";
 
 type Props = {
   page: number;
@@ -20,25 +21,13 @@ export function TicketPagination({
   total,
   onPageChange,
 }: Props) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const from = Math.min((page - 1) * pageSize + 1, total);
-  const to = Math.min(page * pageSize, total);
-
-  /** Build the page number list with ellipsis: [1, …, 4, 5, 6, …, 12] */
-  function pageNumbers(): (number | "…")[] {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-
-    const pages: (number | "…")[] = [1];
-    if (page > 3) pages.push("…");
-
-    const start = Math.max(2, page - 1);
-    const end = Math.min(totalPages - 1, page + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
-
-    if (page < totalPages - 2) pages.push("…");
-    pages.push(totalPages);
-    return pages;
-  }
+  const {
+    totalPages,
+    from,
+    to,
+    pageNumbers,
+    handlePageChange,
+  } = usePagination({ page, pageSize, total, onPageChange });
 
   return (
     <div className="flex flex-col items-center justify-between gap-3 pt-4 sm:flex-row">
@@ -58,7 +47,7 @@ export function TicketPagination({
         <Button
           variant="outline"
           size="icon"
-          onClick={() => onPageChange(page - 1)}
+          onClick={() => handlePageChange(page - 1)}
           disabled={page <= 1}
           aria-label="Previous page"
           className="size-8"
@@ -66,7 +55,7 @@ export function TicketPagination({
           <ChevronLeft className="size-4" />
         </Button>
 
-        {pageNumbers().map((p, i) =>
+        {pageNumbers.map((p, i) =>
           p === "…" ? (
             <span
               key={`ellipsis-${i}`}
@@ -80,7 +69,7 @@ export function TicketPagination({
               key={p}
               variant={p === page ? "default" : "outline"}
               size="icon"
-              onClick={() => onPageChange(p)}
+              onClick={() => handlePageChange(p)}
               aria-label={`Page ${p}`}
               aria-current={p === page ? "page" : undefined}
               className={cn(
@@ -96,7 +85,7 @@ export function TicketPagination({
         <Button
           variant="outline"
           size="icon"
-          onClick={() => onPageChange(page + 1)}
+          onClick={() => handlePageChange(page + 1)}
           disabled={page >= totalPages}
           aria-label="Next page"
           className="size-8"

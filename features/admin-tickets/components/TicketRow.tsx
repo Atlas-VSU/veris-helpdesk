@@ -5,11 +5,11 @@
 "use client";
 
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "./StatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
+import { initials, formatRelativeTime, formatFullDate } from "../utils/format";
 import type { Ticket } from "../types";
 
 type Props = {
@@ -18,18 +18,9 @@ type Props = {
   onSelectChange: (checked: boolean) => void;
 };
 
-/** Derive initials for avatar fallback */
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 export function TicketRow({ ticket, isSelected, onSelectChange }: Props) {
-  const updatedAt = new Date(ticket.updated_at);
-  const timeAgo = formatDistanceToNow(updatedAt, { addSuffix: true });
+  const timeAgo = formatRelativeTime(ticket.updated_at);
+  const fullDate = formatFullDate(ticket.updated_at);
   const avatarLetters = initials(ticket.full_name);
 
   return (
@@ -114,7 +105,7 @@ export function TicketRow({ ticket, isSelected, onSelectChange }: Props) {
         <time
           dateTime={ticket.updated_at}
           className="text-xs text-muted-foreground whitespace-nowrap"
-          title={updatedAt.toLocaleString()}
+          title={fullDate}
         >
           {timeAgo}
         </time>

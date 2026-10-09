@@ -17,39 +17,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { TicketStatus, TicketPriority } from "../types";
-
-export type FilterState = {
-  q: string;
-  status: TicketStatus | "";
-  priority: TicketPriority | "";
-};
+import {
+  STATUS_OPTIONS,
+  PRIORITY_OPTIONS,
+  ALL_VALUE,
+  hasActiveFilters,
+  type FilterState,
+} from "../constants";
 
 type Props = {
   filters: FilterState;
   onChange: (next: Partial<FilterState>) => void;
   onClear: () => void;
 };
-
-const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "waiting_for_client", label: "Awaiting Reply" },
-  { value: "resolved", label: "Resolved" },
-  { value: "closed", label: "Closed" },
-];
-
-const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "urgent", label: "Urgent" },
-];
-
-const ALL_VALUE = "_all" as const;
-
-const hasActiveFilters = (f: FilterState) =>
-  f.q !== "" || f.status !== "" || f.priority !== "";
 
 export function TicketFiltersBar({ filters, onChange, onClear }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);

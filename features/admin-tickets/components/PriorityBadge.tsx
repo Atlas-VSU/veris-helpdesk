@@ -3,40 +3,16 @@
 // Urgent uses destructive (coral) for maximum salience.
 
 import { cn } from "@/lib/utils";
-import type { TicketPriority } from "../types";
+import { PRIORITY_CONFIG, type PriorityBadgeProps } from "../constants/badges";
 
-const PRIORITY_CONFIG: Record<
-  TicketPriority,
-  { label: string; className: string }
-> = {
-  low: {
-    label: "Low",
-    className: "bg-muted text-muted-foreground",
-  },
-  medium: {
-    label: "Medium",
-    className: "bg-accent text-accent-foreground",
-  },
-  high: {
-    label: "High",
-    className: "bg-warning text-warning-foreground",
-  },
-  urgent: {
-    label: "Urgent",
-    className: "bg-destructive text-destructive-foreground",
-  },
-};
-
-type Props = { priority: TicketPriority; className?: string };
-
-export function PriorityBadge({ priority, className }: Props) {
+export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
   const config = PRIORITY_CONFIG[priority];
 
   return (
     <span
       aria-label={`Priority: ${config.label}`}
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap",
         config.className,
         className
       )}
