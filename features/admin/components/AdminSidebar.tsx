@@ -1,5 +1,5 @@
-// features/admin-tickets/components/AdminSidebar.tsx
-// Persistent sidebar for the admin protected layout.
+// app/admin/components/AdminSidebar.tsx
+// Persistent shared sidebar for the admin layout.
 // Highlights the active route using usePathname().
 
 "use client";

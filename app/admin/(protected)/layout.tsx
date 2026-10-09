@@ -2,7 +2,7 @@
     layout.tsx — Defines the shared protected admin layout, such as the sidebar, header, navigation, and authorization checks used across admin pages.
 */
 
-import { AdminSidebar } from "@/features/admin-tickets";
+import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
 
 export default function ProtectedAdminLayout({
   children,

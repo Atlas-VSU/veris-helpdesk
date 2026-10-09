@@ -3,7 +3,6 @@
 
 // Components
 export { TicketsView } from "./components/TicketsView";
-export { AdminSidebar } from "./components/AdminSidebar";
 export { StatusBadge } from "./components/StatusBadge";
 export { PriorityBadge } from "./components/PriorityBadge";
 export { TicketFiltersBar } from "./components/TicketFiltersBar";
