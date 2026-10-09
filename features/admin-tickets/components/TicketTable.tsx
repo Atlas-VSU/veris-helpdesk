@@ -14,13 +14,9 @@ import {
 } from "@/components/ui/table";
 import { TicketRow } from "./TicketRow";
 import { BulkActionsBar } from "./BulkActionsBar";
-import type { Ticket } from "../types";
+import type { TicketTableProps } from "../types/props";
 
-type Props = {
-  tickets: Ticket[];
-};
-
-export function TicketTable({ tickets }: Props) {
+export function TicketTable({ tickets }: TicketTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const allSelected = tickets.length > 0 && selected.size === tickets.length;

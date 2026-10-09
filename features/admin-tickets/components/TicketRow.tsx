@@ -10,15 +10,9 @@ import { StatusBadge } from "./StatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { initials, formatRelativeTime, formatFullDate } from "../utils/format";
-import type { Ticket } from "../types";
+import type { TicketRowProps } from "../types/props";
 
-type Props = {
-  ticket: Ticket;
-  isSelected: boolean;
-  onSelectChange: (checked: boolean) => void;
-};
-
-export function TicketRow({ ticket, isSelected, onSelectChange }: Props) {
+export function TicketRow({ ticket, isSelected, onSelectChange }: TicketRowProps) {
   const timeAgo = formatRelativeTime(ticket.updated_at);
   const fullDate = formatFullDate(ticket.updated_at);
   const avatarLetters = initials(ticket.full_name);

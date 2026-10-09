@@ -7,19 +7,14 @@
 import { Button } from "@/components/ui/button";
 import { Trash2, UserRoundCheck, RefreshCw } from "lucide-react";
 
-type Props = {
-  count: number;
-  onUpdateStatus: () => void;
-  onAssign: () => void;
-  onDelete: () => void;
-};
+import type { BulkActionsBarProps } from "../types/props";
 
 export function BulkActionsBar({
   count,
   onUpdateStatus,
   onAssign,
   onDelete,
-}: Props) {
+}: BulkActionsBarProps) {
   if (count === 0) return null;
 
   return (

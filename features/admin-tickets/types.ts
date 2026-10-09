@@ -1,5 +1,5 @@
 // features/admin-tickets/types.ts
-// Domain types for the admin tickets feature.
+// Domain and component types for the admin tickets feature.
 // Ticket and TicketStatus/TicketPriority align with openapi.yaml schemas.
 
 import type { TicketStatus, TicketPriority, Ticket } from "@/types/database";
@@ -22,3 +22,5 @@ export type AdminTicketsResponse = {
   pageSize: number;
   total: number;
 };
+
+export * from "./types/props";
