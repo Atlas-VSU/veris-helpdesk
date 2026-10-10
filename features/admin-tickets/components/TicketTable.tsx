@@ -42,12 +42,12 @@ export function TicketTable({ tickets }: TicketTableProps) {
   return (
     <div>
       {/* Bulk actions */}
-      <BulkActionsBar
+      {/* <BulkActionsBar
         count={selected.size}
         onAssign={clearSelection}
         onUpdateStatus={clearSelection}
         onDelete={clearSelection}
-      />
+      /> */}
 
       {/* Table card */}
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
@@ -55,16 +55,16 @@ export function TicketTable({ tickets }: TicketTableProps) {
           <TableHeader>
             <TableRow className="bg-muted/60 hover:bg-muted/60 border-b border-border">
               {/* Master checkbox */}
-              <TableHead className="w-12 pl-4 pr-2">
-                <Checkbox
+              {/* <TableHead className="w-12 pl-4 pr-2">
+                 <Checkbox
                   id="select-all"
                   checked={allSelected}
                   indeterminate={someSelected}
                   onCheckedChange={(checked) => toggleAll(Boolean(checked))}
                   aria-label={allSelected ? "Deselect all" : "Select all"}
                   className="border-border data-checked:bg-primary data-checked:text-primary-foreground"
-                />
-              </TableHead>
+                /> 
+              </TableHead> */}
               <TableHead className="px-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 ID
               </TableHead>

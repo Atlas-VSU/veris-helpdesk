@@ -64,14 +64,14 @@ export function TicketsView() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="gap-1.5">
+            {/* <Button variant="outline" size="sm" className="gap-1.5">
               <Download className="size-4" />
               Export
             </Button>
             <Button size="sm" className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
               <Plus className="size-4" />
               New Ticket
-            </Button>
+            </Button> */}
           </div>
         </div>
 

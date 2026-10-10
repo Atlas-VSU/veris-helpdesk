@@ -27,7 +27,7 @@ export function TicketRow({ ticket, isSelected, onSelectChange }: TicketRowProps
       )}
     >
       {/* Checkbox */}
-      <td className="py-4 pl-4 pr-2 align-middle w-12">
+      {/* <td className="py-4 pl-4 pr-2 align-middle w-12">
         <Checkbox
           id={`select-${ticket.id}`}
           checked={isSelected}
@@ -35,7 +35,7 @@ export function TicketRow({ ticket, isSelected, onSelectChange }: TicketRowProps
           aria-label={`Select ticket ${ticket.ticket_number}`}
           className="border-border data-checked:bg-primary data-checked:text-primary-foreground"
         />
-      </td>
+      </td> */}
 
       {/* Ticket Number */}
       <td className="py-4 px-3 align-middle">
