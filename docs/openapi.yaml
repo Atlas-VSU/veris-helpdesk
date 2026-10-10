@@ -288,9 +288,10 @@ paths:
       operationId: adminListTickets
       description: >
         Results are sorted newest first. The q parameter matches subject and
-        ticket_number case-insensitively. page defaults to 1 and pageSize
-        defaults to 10; pageSize has a maximum of 50. Out-of-range values
-        return 400.
+        ticket_number case-insensitively. Status and priority filters can be
+        combined. page defaults to 1 and pageSize defaults to 10; pageSize has
+        a maximum of 50. Out-of-range values return 400, and an invalid
+        priority value returns 400.
       security:
         - adminSession: []
       parameters:
@@ -299,6 +300,11 @@ paths:
           required: false
           schema:
             $ref: "#/components/schemas/TicketStatus"
+        - name: priority
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Priority"
         - name: q
           in: query
           required: false
