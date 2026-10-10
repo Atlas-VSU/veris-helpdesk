@@ -3,7 +3,7 @@ import { Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { NativeSelect as Select } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   TicketFormProps,
