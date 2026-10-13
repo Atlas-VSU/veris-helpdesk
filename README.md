@@ -12,7 +12,7 @@ A ticketing system for VERIS clients (subscribers and students) to submit suppor
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
 - **Backend / Database**: Supabase (Postgres, Auth, Storage, Edge Functions)
-- **Email**: Resend (ticket confirmations, OTP codes, admin notifications)
+- **Email**: Gmail SMTP via `nodemailer` (OTP codes today; ticket confirmations and admin notifications are planned)
 - **Forms & Validation**: React Hook Form + Zod (schemas live in `features/<domain>/schemas/`, see [Repository Architecture](#repository-architecture))
 - **Migrations**: Supabase CLI (migration-first workflow — see [Database Setup](#database-setup))
 
@@ -39,22 +39,40 @@ app/                              # Next.js App Router (Routes & Layouts)
 │       ├── categories/           # Ticket categories
 │       └── admins/               # Admin account management
 ├── api/
-│   └── admin/login/              # Admin login endpoint (Zod-validated)
+│   ├── admin/
+│   │   ├── login/                # Admin login endpoint (Zod-validated)
+│   │   └── logout/               # Admin logout (clears the admin_session cookie)
+│   └── otp/
+│       ├── request/              # Email a 6-digit code
+│       └── verify/               # Check the code, set the client_session cookie
 ├── layout.tsx
 components/
 └── ui/                            # Shared UI primitives (button, card, ...)
 features/                          # Feature-scoped logic, grouped by domain
 ├── landing/                       # components/, data/, types/ for the landing page
+├── shared/                        # Navbar, footer, navigation items
+├── submit-ticket/                 # Ticket form components, hook, and submit action
 ├── tickets/
-│   └── schemas/                   # Zod schemas — create ticket, request/verify OTP
-└── admin/
-    └── schemas/                   # Zod schemas — admin login
+│   └── schemas/                   # Zod schemas — create ticket, OTP request/verify
+├── admin/
+│   ├── components/                # Admin sidebar
+│   └── schemas/                   # Zod schemas — admin login
+└── admin-tickets/                 # Tickets Management screen (table, filters, pagination)
 lib/
 ├── supabase-server.ts             # Supabase service-role client (server-side only)
-├── rate-limit.ts                  # Rate-limiting middleware
+├── rate-limit.ts                  # Upstash rate-limit settings (login, ticket submit, OTP)
+├── client-token.ts                # Makes and checks the client_session token
+├── client-auth.ts                 # getClientEmail() — who is this client? (server side)
+├── otp.ts                         # OTP settings, code generation, hashing
+├── otp-email.ts                   # Sends the OTP email (Gmail SMTP)
 └── utils.ts
+proxy.ts                           # Applies the rate limits to ticket-submit and OTP routes
+docs/
+├── openapi.yaml                   # API contract — source of truth for endpoints
+└── pr-description-prompt.md       # AI prompt for drafting PR descriptions
 types/
-└── database.ts                    # Shared DB row types
+├── database.ts                    # Shared DB row types
+└── supabase.ts                    # Supabase table types
 supabase/
 ├── config.toml
 └── migrations/                    # Versioned schema migrations (source of truth for DB)
@@ -90,10 +108,10 @@ supabase/
 - Client OTP verification, Admin login, session timeout, route auth middleware, rate limiting
 - Server-side validation (fields, email format, CAPTCHA, attachment type/size)
 - Create ticket endpoint, attachment upload handler, Supabase Storage integration
-- Ticket confirmation email (Resend)
+- Ticket confirmation email (Gmail SMTP)
 - Get/list/filter/search tickets, update status, override priority, change category, close/reopen
 - Client + admin reply endpoints, auto-email on admin reply
-- Notifications: insert on new ticket + client reply, list/mark-read/delete endpoints, admin notification email (Resend)
+- Notifications: insert on new ticket + client reply, list/mark-read/delete endpoints, admin notification email (Gmail SMTP)
 - Input validation middleware, centralized error handling
 
 ### Post-MVP (explicitly deferred)
@@ -101,6 +119,39 @@ supabase/
 Categories CRUD, activity log (table + panel), admin roles / role-based access, admin account management UI, admin password reset (custom-built), admin login lockout (custom-built), internal notes, assign/reassign admin, merge duplicate tickets, sort tickets, status-change email, client profile card, CSV/PDF export, scheduled DB backup, data retention rules automation.
 
 > Rationale: these were cut to match leads' "submit / track / reply, keep it simple" guidance. Most rely on Supabase's built-in tooling in the meantime (e.g. Supabase Auth covers password reset and login lockout; Supabase itself handles automated backups on paid tiers).
+
+---
+
+## API Contract
+
+`docs/openapi.yaml` is the source of truth for endpoint URLs, request bodies, responses, cookies, and error codes. **Read it before building or calling an endpoint.** If you change an endpoint, update the file in the same PR, and check it with:
+
+```bash
+npx @redocly/cli lint docs/openapi.yaml
+```
+
+Ticket submission is a server action (`features/submit-ticket/actions.ts`), not an HTTP endpoint, so it is not in that file.
+
+---
+
+## Authentication & Sessions
+
+Clients have no accounts. They prove they own an email with a one-time code, and admins log in with a password. Each gets a cookie. Both cookies are signed with `JWT_SECRET` and are `httpOnly` (and `secure` in production).
+
+| Cookie | Who | Set by | Lasts | Token holds |
+| --- | --- | --- | --- | --- |
+| `client_session` | Clients | `POST /api/otp/verify` (after a correct code) | 2 hours | `{ email, role: "client" }` |
+| `admin_session` | Admins | `POST /api/admin/login` (cleared by `POST /api/admin/logout`) | 24 hours | `{ adminId, email }` |
+
+**Client OTP flow**
+
+1. `POST /api/otp/request` — makes a 6-digit code, stores it hashed in `otp_verifications`, and emails it. The code expires in 10 minutes, and a new one can be requested every 60 seconds. The answer is always the same message, whether or not the email has tickets, so nobody can use it to find out which emails have tickets. A code is only emailed if the email has at least one ticket.
+2. `POST /api/otp/verify` — checks the code. A code works once, and 5 wrong tries lock it. A correct code sets the `client_session` cookie.
+3. Client routes read the cookie on the server with `getClientEmail()` from `lib/client-auth.ts`. It returns the email in lowercase, or `null` (the route then answers `401`).
+
+**Emails are saved in lowercase** (the Zod schemas trim and lowercase them), so `John@Mail.com` and `john@mail.com` are the same person.
+
+**Rate limits** (Upstash, per IP, only active when the Upstash env vars are set): login 5 per minute, ticket submission 5 per hour, OTP 5 per 5 minutes. They are set in `lib/rate-limit.ts` and applied by `proxy.ts` and the login route.
 
 ---
 
@@ -116,7 +167,7 @@ Schema lives in `supabase/migrations/` — **not** the dashboard SQL editor. Alw
 | `tickets`           | Core ticket record — submitter info, issue details, priority, status |
 | `messages`          | Conversation thread — client and admin replies                       |
 | `attachments`       | Files linked to a ticket or a specific message                       |
-| `otp_verifications` | Email OTP codes for the "My Tickets" access flow                     |
+| `otp_verifications` | Hashed email OTP codes + wrong-try counter (`attempts`) for the "My Tickets" access flow |
 | `notifications`     | Admin dashboard inbox — new ticket / client reply events             |
 
 ### Enums
@@ -130,8 +181,13 @@ supabase login
 supabase link --project-ref <your-project-ref>
 supabase migration new <migration_name>
 # edit the generated .sql file in supabase/migrations/
+supabase db push --dry-run   # lists what would run, changes nothing
 supabase db push
 ```
+
+- Never edit a migration that is already on `dev`. Add a new file instead.
+- Run `supabase db push --dry-run` first. It should list **only your new file**.
+- If it says remote migration versions are missing from your folder, `git pull` the latest `dev` first. Don't run `supabase migration repair` or `supabase db pull` without asking the PM.
 
 ### Known open items
 
@@ -158,9 +214,21 @@ supabase db push
 ```
 
 2. **Configure environment variables**:
-   Copy `.env.example` to `.env.local`, then fill in the values shared in the team's Discord/Messenger group.
+   Create `.env.local` with the names below (if a `.env.example` exists, copy it instead), then fill in the values shared in the team's Discord/Messenger group. **Never put a real value in the README, and never commit `.env.local`.**
 
-   > Env vars change frequently as new features are added (Resend keys, JWT secret, etc.) — always check the group for the latest values rather than relying on old ones you may have saved locally.
+```text
+   SUPABASE_URL=
+   SUPABASE_SECRET_KEY=           # service-role key, server only
+   JWT_SECRET=                    # signs the client_session and admin_session cookies
+   UPSTASH_REDIS_REST_URL=        # optional: rate limiting is off without these two
+   UPSTASH_REDIS_REST_TOKEN=
+   GMAIL_USER=                    # sender account for OTP emails
+   GMAIL_APP_PASSWORD=            # a Google "app password", not the account password
+```
+
+   > Env vars change frequently as new features are added (Gmail app password, JWT secret, etc.) — always check the group for the latest values rather than relying on old ones you may have saved locally.
+
+   Without the two Gmail variables the OTP email is not sent. In development the code is also printed in the terminal that runs `npm run dev`, so you can still test the flow.
 
 3. **Run the development server**:
 
@@ -177,10 +245,18 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
    npm run build
 ```
 
+### Testing the OTP flow locally
+
+1. Create a ticket with an email you can read (the OTP only sends a code to emails that have a ticket).
+2. `POST /api/otp/request` with `{ "email": "..." }`. The code appears in the `npm run dev` terminal (and in the inbox if Gmail is set up).
+3. `POST /api/otp/verify` with `{ "email": "...", "code": "123456" }`. A correct code returns `200` and a `set-cookie: client_session=...` header.
+
+If the Upstash variables are set, OTP calls are limited to 5 per 5 minutes per IP, so a plain `429 "Too many OTP requests"` while testing means wait a few minutes.
+
 ---
 
 ## Notes for Contributors
 
 - This is a **team learning project** — first time several of us are working in these roles, PM included. Ask questions early rather than guessing on scope; if something feels like it might be over-engineering, flag it before building.
 - Stick to Core MVP unless a lead has explicitly signed off on adding something (see the notifications inbox in this README's Core MVP section as an example of a feature added _after_ lead review, not before).
-- Edge Functions + Database Webhooks + Resend follow the same pattern across features (e.g. ticket confirmation, OTP, admin notifications) — check an existing implementation before building a new one from scratch.
+- Emails are sent from server code, not from Supabase Edge Functions. OTP emails use Gmail SMTP in `lib/otp-email.ts` — check that file before building another email, and reuse its approach unless the team decides otherwise.
