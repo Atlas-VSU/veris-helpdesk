@@ -162,6 +162,7 @@ export type Database = {
       }
       otp_verifications: {
         Row: {
+          attempts: number
           code: string
           created_at: string
           email: string
@@ -170,6 +171,7 @@ export type Database = {
           used: boolean
         }
         Insert: {
+          attempts?: number
           code: string
           created_at?: string
           email: string
@@ -178,6 +180,7 @@ export type Database = {
           used?: boolean
         }
         Update: {
+          attempts?: number
           code?: string
           created_at?: string
           email?: string
