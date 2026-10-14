@@ -72,7 +72,8 @@ export function useSubmitTicket() {
         typeof result.ticketNumber === "string" &&
         result.ticketNumber.trim().length > 0
       ) {
-        setTicketNumber(result.ticketNumber);
+        const normalizedTicketNumber = result.ticketNumber.trim();
+        setTicketNumber(normalizedTicketNumber);
         setSubmittedData(submissionSnapshot);
         setHasSubmitted(true);
       } else {
