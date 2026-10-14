@@ -37,8 +37,8 @@ export function EmailVerificationFlow() {
 
   return (
     <EmailVerificationForm
-      onCodeRequested={(email, message) => {
-        startResendCountdown();
+      onCodeRequested={(email, message, retryAfterSeconds) => {
+        startResendCountdown(retryAfterSeconds);
         setRequestedCode({ email, message });
       }}
     />

@@ -5,11 +5,35 @@ import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  getOtpErrorCode,
+  getOtpErrorMessage,
+  getRetryAfterSeconds,
+  isOtpApiPayload,
+} from "@/features/tickets/otp-api";
 import { otpRequestSchema } from "@/features/tickets/schemas/otp";
 
 type EmailVerificationFormProps = {
-  onCodeRequested: (email: string, message: string) => void;
+  onCodeRequested: (email: string, message: string, retryAfterSeconds?: number) => void;
 };
+
+const REQUEST_SUCCESS_MESSAGE = "If this email has tickets, a code was sent.";
+
+function getRequestError(status: number, payload: unknown) {
+  if (status === 400) {
+    return getOtpErrorMessage(payload) ?? "Enter a valid email address.";
+  }
+
+  if (status === 429) {
+    return "Too many verification-code requests. Please wait a few minutes and try again.";
+  }
+
+  if (status >= 500) {
+    return "We couldn't send a verification code right now. Please try again.";
+  }
+
+  return "We couldn't send a verification code. Please try again.";
+}
 
 export function EmailVerificationForm({ onCodeRequested }: EmailVerificationFormProps) {
   const [email, setEmail] = useState("");
@@ -49,21 +73,19 @@ export function EmailVerificationForm({ onCodeRequested }: EmailVerificationForm
       const payload: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
-        const message =
-          payload &&
-          typeof payload === "object" &&
-          "error" in payload &&
-          typeof payload.error === "string"
-            ? payload.error
-            : "We couldn't send a verification code. Please try again.";
+        const retryAfterSeconds = getRetryAfterSeconds(payload);
 
-        setError(message);
+        if (getOtpErrorCode(payload) === "OTP_RESEND_WAIT" && retryAfterSeconds !== null) {
+          onCodeRequested(result.data.email, REQUEST_SUCCESS_MESSAGE, retryAfterSeconds);
+          return;
+        }
+
+        setError(getRequestError(response.status, payload));
         return;
       }
 
       if (
-        !payload ||
-        typeof payload !== "object" ||
+        !isOtpApiPayload(payload) ||
         !("message" in payload) ||
         typeof payload.message !== "string"
       ) {
@@ -72,7 +94,7 @@ export function EmailVerificationForm({ onCodeRequested }: EmailVerificationForm
 
       onCodeRequested(result.data.email, payload.message);
     } catch {
-      setError("We couldn't send a verification code. Check your connection and try again.");
+      setError("We couldn't reach the verification service. Check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }

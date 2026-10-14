@@ -1,18 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  getOtpErrorCode,
+  getOtpErrorMessage,
+  getRetryAfterSeconds,
+  isOtpApiPayload,
+} from "@/features/tickets/otp-api";
 
 const OTP_RESEND_SECONDS = 60;
 
-type OtpRequestPayload = {
-  message?: unknown;
-  error?: unknown;
-  code?: unknown;
-  retryAfterSeconds?: unknown;
-};
+function getResendError(status: number, payload: unknown) {
+  if (status === 400) {
+    return getOtpErrorMessage(payload) ?? "The resend request was invalid. Please try again.";
+  }
 
-function isOtpRequestPayload(value: unknown): value is OtpRequestPayload {
-  return Boolean(value) && typeof value === "object";
+  if (status === 429) {
+    return "Too many verification-code requests. Please wait a few minutes and try again.";
+  }
+
+  if (status >= 500) {
+    return "We couldn't send a new code right now. Please try again.";
+  }
+
+  return "We couldn't resend the verification code. Please try again.";
 }
 
 export function useEmailVerification(email: string | null) {
@@ -73,24 +84,21 @@ export function useEmailVerification(email: string | null) {
       const payload: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
-        if (
-          isOtpRequestPayload(payload) &&
-          payload.code === "OTP_RESEND_WAIT" &&
-          typeof payload.retryAfterSeconds === "number" &&
-          Number.isFinite(payload.retryAfterSeconds)
-        ) {
-          startResendCountdown(payload.retryAfterSeconds);
+        const retryAfterSeconds = getRetryAfterSeconds(payload);
+
+        if (getOtpErrorCode(payload) === "OTP_RESEND_WAIT" && retryAfterSeconds !== null) {
+          startResendCountdown(retryAfterSeconds);
+          setResendError(
+            `Please wait ${retryAfterSeconds} seconds before requesting another code.`,
+          );
+          return false;
         }
 
-        setResendError(
-          isOtpRequestPayload(payload) && typeof payload.error === "string"
-            ? payload.error
-            : "We couldn't resend the verification code. Please try again.",
-        );
+        setResendError(getResendError(response.status, payload));
         return false;
       }
 
-      if (!isOtpRequestPayload(payload) || typeof payload.message !== "string") {
+      if (!isOtpApiPayload(payload) || typeof payload.message !== "string") {
         throw new Error("Unexpected OTP request response");
       }
 
