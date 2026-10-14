@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { CheckCircle2, Clock3 } from "lucide-react";
+import { Check, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TicketSuccessStateProps } from "@/features/submit-ticket/types/types";
 
 export function TicketSuccessState({ ticketNumber, email, subject, service, priority, description, onSubmitAnother }: TicketSuccessStateProps) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col items-center rounded-3xl border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-6 text-center shadow-soft md:p-16">
-      <div className="mb-6 flex size-24 items-center justify-center rounded-full bg-[var(--palette-off-white)] text-[var(--palette-dark-olive)] shadow-soft">
-        <CheckCircle2 aria-hidden="true" className="size-12" />
+      <div className="mb-4 flex size-14 items-center justify-center rounded-full border border-[var(--palette-stone)]/50 bg-[var(--palette-moss)]/10">
+        <span className="flex size-9 items-center justify-center rounded-full bg-[var(--palette-moss)] text-[var(--palette-white)]">
+          <Check aria-hidden="true" className="size-5" strokeWidth={3} />
+        </span>
       </div>
       <h1 className="font-serif text-3xl font-semibold text-[var(--palette-dark-olive)] md:text-4xl">Your request has been recorded.</h1>
       <p className="mt-3 text-lg leading-7 text-[var(--palette-dark-olive)]">Your request is ready for review.</p>
