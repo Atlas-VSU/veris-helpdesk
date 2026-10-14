@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import type { TicketFormData } from "@/features/submit-ticket/types/types";
 
 import { submitTicketAction } from "../actions";
@@ -24,6 +24,9 @@ export function useSubmitTicket() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ticketNumber, setTicketNumber] = useState<string | null>(null);
+  const [submittedData, setSubmittedData] = useState<TicketFormData | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const submissionPending = useRef(false);
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
@@ -40,39 +43,76 @@ export function useSubmitTicket() {
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    formRef.current = event.currentTarget.form;
     setFileName(event.target.files?.[0]?.name ?? "");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionPending.current) return;
+
+    submissionPending.current = true;
+    formRef.current = event.currentTarget;
     setIsSubmitting(true);
     setError(null);
+    setHasSubmitted(false);
+    setTicketNumber(null);
+    setSubmittedData(null);
 
     try {
+      // Keep the confirmation tied to this submission, even if fields change while awaiting it.
+      const submissionSnapshot = Object.fromEntries(
+        Object.entries(formData).map(([key, value]) => [
+          key,
+          typeof value === "string" ? value.trim() : value,
+        ]),
+      ) as TicketFormData;
       const formDataObj = new FormData(event.currentTarget);
+
+      Object.entries(submissionSnapshot).forEach(([key, value]) => {
+        formDataObj.set(
+          key,
+          typeof value === "boolean" ? (value ? "on" : "") : value,
+        );
+      });
+
       const result = await submitTicketAction(formDataObj);
       
       if (result.error) {
         setError(result.error);
-      } else {
-        setTicketNumber(result.ticketNumber ?? null);
+      } else if (
+        result.success === true &&
+        typeof result.ticketNumber === "string" &&
+        result.ticketNumber.trim().length > 0
+      ) {
+        const normalizedTicketNumber = result.ticketNumber.trim();
+        setTicketNumber(normalizedTicketNumber);
+        setSubmittedData(submissionSnapshot);
         setHasSubmitted(true);
+      } else {
+        setError("We couldn't confirm your submission. Please contact support before submitting again.");
       }
     } catch (err) {
       console.error("Submission error:", err);
       setError("An unexpected error occurred. Please try again.");
     } finally {
+      submissionPending.current = false;
       setIsSubmitting(false);
     }
   }
 
 
   function handleMakeAnotherTicket() {
+    // Avoid clearing the form while its submission is still being processed.
+    if (submissionPending.current) return;
+
+    formRef.current?.reset();
     setFormData(initialFormData);
     setFileName("");
     setHasSubmitted(false);
     setError(null);
     setTicketNumber(null);
+    setSubmittedData(null);
   }
 
   return {
@@ -82,6 +122,7 @@ export function useSubmitTicket() {
     hasSubmitted,
     error,
     ticketNumber,
+    submittedData,
     handleInputChange,
     handleSelectChange,
     handleConsentChange,
