@@ -13,6 +13,7 @@ export async function fetchAdminTickets(
     const params = new URLSearchParams();
 
     if (query.status) params.set("status", query.status);
+    if (query.priority) params.set("priority", query.priority);
     if (query.q) params.set("q", query.q);
     if (query.page != null) params.set("page", String(query.page));
     if (query.pageSize != null) params.set("pageSize", String(query.pageSize));
