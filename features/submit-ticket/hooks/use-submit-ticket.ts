@@ -60,9 +60,22 @@ export function useSubmitTicket() {
     setSubmittedData(null);
 
     try {
-      const formDataObj = new FormData(event.currentTarget);
       // Keep the confirmation tied to this submission, even if fields change while awaiting it.
-      const submissionSnapshot = { ...formData };
+      const submissionSnapshot = Object.fromEntries(
+        Object.entries(formData).map(([key, value]) => [
+          key,
+          typeof value === "string" ? value.trim() : value,
+        ]),
+      ) as TicketFormData;
+      const formDataObj = new FormData(event.currentTarget);
+
+      Object.entries(submissionSnapshot).forEach(([key, value]) => {
+        formDataObj.set(
+          key,
+          typeof value === "boolean" ? (value ? "on" : "") : value,
+        );
+      });
+
       const result = await submitTicketAction(formDataObj);
       
       if (result.error) {
