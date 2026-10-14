@@ -1,8 +1,28 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ticketSubmissionRateLimit, otpRateLimit } from "@/lib/rate-limit";
+import { ADMIN_COOKIE_NAME, verifyAdminToken } from "@/lib/admin-token";
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdminApi = pathname === "/api/admin" || pathname.startsWith("/api/admin/");
+  // The API contract keeps login and logout public, even for invalid sessions.
+  const isPublicAdminRoute =
+    pathname === "/admin/login" ||
+    pathname === "/api/admin/login" ||
+    pathname === "/api/admin/logout";
+
+  if ((isAdminPage || isAdminApi) && !isPublicAdminRoute) {
+    const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+    if (!token || !verifyAdminToken(token)) {
+      if (isAdminApi) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+  }
+
   // Only apply rate limiting to ticket submissions (POST requests)
   if (
     request.nextUrl.pathname.startsWith("/api/tickets") ||
@@ -95,6 +115,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
     "/api/tickets/:path*",
     "/submit-ticket/:path*",
     "/api/otp/:path*",

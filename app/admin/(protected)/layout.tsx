@@ -3,10 +3,14 @@
 */
 
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { getAdminSession } from "@/lib/admin-auth";
+import { redirect } from "next/navigation";
 
-export default function ProtectedAdminLayout({
+export default async function ProtectedAdminLayout({
   children,
 }: LayoutProps<"/admin">) {
+  if (!(await getAdminSession())) redirect("/admin/login");
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AdminSidebar />
