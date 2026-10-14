@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { KeyRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,13 +19,15 @@ export function OtpVerificationForm({
   requestMessage,
   onChangeEmail,
 }: OtpVerificationFormProps) {
+  const router = useRouter();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isCodeReady, setIsCodeReady] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsCodeReady(false);
+
+    if (isSubmitting) return;
 
     const result = otpVerifySchema.safeParse({ email, code });
 
@@ -35,7 +38,48 @@ export function OtpVerificationForm({
 
     setCode(result.data.code);
     setError(null);
-    setIsCodeReady(true);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(result.data),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          payload &&
+          typeof payload === "object" &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "We couldn't verify that code. Please try again.";
+
+        setError(message);
+        return;
+      }
+
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        !("message" in payload) ||
+        payload.message !== "Verified" ||
+        !("email" in payload) ||
+        payload.email !== result.data.email
+      ) {
+        throw new Error("Unexpected OTP verification response");
+      }
+
+      router.replace("/tickets");
+      router.refresh();
+    } catch {
+      setError("We couldn't verify that code. Check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -43,6 +87,7 @@ export function OtpVerificationForm({
       noValidate
       onSubmit={handleSubmit}
       aria-label="Code verification"
+      aria-busy={isSubmitting}
       className="rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-soft sm:p-10"
     >
       <div className="mb-6 flex size-14 items-center justify-center rounded-full border border-border bg-[var(--palette-moss)]/10 text-primary">
@@ -74,14 +119,14 @@ export function OtpVerificationForm({
           pattern="[0-9]{6}"
           maxLength={6}
           required
+          disabled={isSubmitting}
           value={code}
           onChange={(event) => {
             setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
             setError(null);
-            setIsCodeReady(false);
           }}
           aria-invalid={Boolean(error)}
-          aria-describedby={`verification-code-hint${error ? " verification-code-error" : ""}${isCodeReady ? " verification-code-status" : ""}`}
+          aria-describedby={`verification-code-hint verification-code-status${error ? " verification-code-error" : ""}`}
           placeholder="000000"
           className="mt-3 h-14 text-center font-mono text-2xl tracking-[0.5em] tabular-nums aria-invalid:border-destructive"
         />
@@ -93,13 +138,18 @@ export function OtpVerificationForm({
         </p>
       )}
 
-      <Button type="submit" className="mt-6 min-h-12 w-full whitespace-normal px-4 py-3">
-        Verify code
+      <Button
+        type="submit"
+        disabled={isSubmitting}
+        className="mt-6 min-h-12 w-full whitespace-normal px-4 py-3"
+      >
+        {isSubmitting ? "Verifying..." : "Verify code"}
       </Button>
 
       <Button
         type="button"
         variant="link"
+        disabled={isSubmitting}
         onClick={onChangeEmail}
         className="mt-2 h-auto w-full whitespace-normal py-2"
       >
@@ -111,7 +161,7 @@ export function OtpVerificationForm({
         role="status"
         className="mt-4 text-sm leading-6 text-muted-foreground"
       >
-        {isCodeReady ? "The code is ready to verify." : requestMessage}
+        {requestMessage}
       </p>
     </form>
   );
