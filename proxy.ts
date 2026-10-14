@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ticketSubmissionRateLimit, otpRateLimit } from "@/lib/rate-limit";
+import { checkAuthRateLimit, ticketSubmissionRateLimit, otpRateLimit } from "@/lib/rate-limit";
 import { ADMIN_COOKIE_NAME, verifyAdminToken } from "@/lib/admin-token";
 
 export async function proxy(request: NextRequest) {
@@ -76,11 +76,9 @@ export async function proxy(request: NextRequest) {
       const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
       try {
-        if (!otpRateLimit) {
-          return NextResponse.next();
-        }
-
-        const { success, limit, reset, remaining } = await otpRateLimit.limit(ip);
+        const result = await checkAuthRateLimit(otpRateLimit, ip);
+        if (!result) return NextResponse.next();
+        const { success, limit, reset, remaining } = result;
 
         if (!success) {
           return new NextResponse(
@@ -103,9 +101,12 @@ export async function proxy(request: NextRequest) {
         response.headers.set("X-RateLimit-Reset", reset.toString());
 
         return response;
-      } catch (error) {
-        console.error("OTP rate limiting error:", error);
-        return NextResponse.next();
+      } catch {
+        console.error("OTP rate limiting is unavailable");
+        return NextResponse.json(
+          { error: "Something went wrong. Please try again." },
+          { status: 500 },
+        );
       }
     }
   }

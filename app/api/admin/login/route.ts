@@ -3,21 +3,26 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { AdminRow } from "@/types/database";
-import { loginRateLimit } from "@/lib/rate-limit";
+import { checkAuthRateLimit, loginRateLimit } from "@/lib/rate-limit";
 import { adminLoginSchema } from "@/features/admin/schemas/admin";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
 
-  if (loginRateLimit) {
-    const { success } = await loginRateLimit.limit(ip);
-
-    if (!success) {
+  try {
+    const result = await checkAuthRateLimit(loginRateLimit, ip);
+    if (result && !result.success) {
       return NextResponse.json(
         { error: "Too many login attempts. Please try again later" },
         { status: 429 },
       );
     }
+  } catch {
+    console.error("Login rate limiting is unavailable");
+    return NextResponse.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
   }
   let body: unknown;
 
