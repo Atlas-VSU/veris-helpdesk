@@ -11,18 +11,35 @@ import { otpVerifySchema } from "@/features/tickets/schemas/otp";
 type OtpVerificationFormProps = {
   email: string;
   requestMessage: string;
+  secondsUntilResend: number;
+  isResending: boolean;
+  resendError: string | null;
+  onResend: () => Promise<boolean>;
   onChangeEmail: () => void;
 };
 
 export function OtpVerificationForm({
   email,
   requestMessage,
+  secondsUntilResend,
+  isResending,
+  resendError,
+  onResend,
   onChangeEmail,
 }: OtpVerificationFormProps) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleResend() {
+    const wasSent = await onResend();
+
+    if (wasSent) {
+      setCode("");
+      setError(null);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -148,10 +165,30 @@ export function OtpVerificationForm({
 
       <Button
         type="button"
+        variant="outline"
+        disabled={isSubmitting || isResending || secondsUntilResend > 0}
+        onClick={handleResend}
+        className="mt-3 min-h-10 w-full whitespace-normal px-4 py-2"
+      >
+        {isResending
+          ? "Resending code..."
+          : secondsUntilResend > 0
+            ? `Resend code in ${secondsUntilResend}s`
+            : "Resend code"}
+      </Button>
+
+      {resendError && (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {resendError}
+        </p>
+      )}
+
+      <Button
+        type="button"
         variant="link"
-        disabled={isSubmitting}
+        disabled={isSubmitting || isResending}
         onClick={onChangeEmail}
-        className="mt-2 h-auto w-full whitespace-normal py-2"
+        className="mt-1 h-auto w-full whitespace-normal py-2"
       >
         Use a different email
       </Button>
