@@ -7,10 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { otpRequestSchema } from "@/features/tickets/schemas/otp";
 
-export function EmailVerificationForm() {
+type EmailVerificationFormProps = {
+  onCodeRequested: (email: string, message: string) => void;
+};
+
+export function EmailVerificationForm({ onCodeRequested }: EmailVerificationFormProps) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
 
@@ -18,8 +21,6 @@ export function EmailVerificationForm() {
     event.preventDefault();
 
     if (isSubmitting) return;
-
-    setStatusMessage(null);
 
     const normalizedEmail = email.trim().toLowerCase();
     setEmail(normalizedEmail);
@@ -69,7 +70,7 @@ export function EmailVerificationForm() {
         throw new Error("Unexpected OTP request response");
       }
 
-      setStatusMessage(payload.message);
+      onCodeRequested(result.data.email, payload.message);
     } catch {
       setError("We couldn't send a verification code. Check your connection and try again.");
     } finally {
@@ -110,10 +111,9 @@ export function EmailVerificationForm() {
         onChange={(event) => {
           setEmail(event.target.value);
           setError(null);
-          setStatusMessage(null);
         }}
         aria-invalid={Boolean(error)}
-        aria-describedby={`verification-email-hint${error ? " verification-email-error" : ""}${statusMessage ? " verification-email-status" : ""}`}
+        aria-describedby={`verification-email-hint${error ? " verification-email-error" : ""}`}
         placeholder="name@example.com"
         className="mt-3 h-12 aria-invalid:border-destructive"
       />
@@ -131,16 +131,6 @@ export function EmailVerificationForm() {
       >
         {isSubmitting ? "Sending code..." : "Send verification code"}
       </Button>
-
-      {statusMessage && (
-        <p
-          id="verification-email-status"
-          role="status"
-          className="mt-4 text-sm leading-6 text-muted-foreground"
-        >
-          {statusMessage}
-        </p>
-      )}
     </form>
   );
 }

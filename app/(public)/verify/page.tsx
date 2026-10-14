@@ -1,4 +1,4 @@
-import { EmailVerificationForm } from "@/features/tickets/components/email-verification-form";
+import { EmailVerificationFlow } from "@/features/tickets/components/email-verification-flow";
 
 export default function VerifyPage() {
   return (
@@ -11,7 +11,7 @@ export default function VerifyPage() {
           Access your support tickets with a verification code sent to your email.
         </p>
       </header>
-      <EmailVerificationForm />
+      <EmailVerificationFlow />
     </main>
   );
 }
