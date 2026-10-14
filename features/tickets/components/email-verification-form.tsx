@@ -10,12 +10,16 @@ import { otpRequestSchema } from "@/features/tickets/schemas/otp";
 export function EmailVerificationForm() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [emailValidated, setEmailValidated] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setEmailValidated(false);
+
+    if (isSubmitting) return;
+
+    setStatusMessage(null);
 
     const normalizedEmail = email.trim().toLowerCase();
     setEmail(normalizedEmail);
@@ -33,7 +37,44 @@ export function EmailVerificationForm() {
 
     setEmail(result.data.email);
     setError(null);
-    setEmailValidated(true);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/otp/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: result.data.email }),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          payload &&
+          typeof payload === "object" &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "We couldn't send a verification code. Please try again.";
+
+        setError(message);
+        return;
+      }
+
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        !("message" in payload) ||
+        typeof payload.message !== "string"
+      ) {
+        throw new Error("Unexpected OTP request response");
+      }
+
+      setStatusMessage(payload.message);
+    } catch {
+      setError("We couldn't send a verification code. Check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -41,6 +82,7 @@ export function EmailVerificationForm() {
       noValidate
       onSubmit={handleSubmit}
       aria-label="Email verification"
+      aria-busy={isSubmitting}
       className="rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-soft sm:p-10"
     >
       <div className="mb-6 flex size-14 items-center justify-center rounded-full border border-border bg-[var(--palette-moss)]/10 text-primary">
@@ -63,14 +105,15 @@ export function EmailVerificationForm() {
         autoCapitalize="none"
         spellCheck={false}
         required
+        disabled={isSubmitting}
         value={email}
         onChange={(event) => {
           setEmail(event.target.value);
           setError(null);
-          setEmailValidated(false);
+          setStatusMessage(null);
         }}
         aria-invalid={Boolean(error)}
-        aria-describedby={`verification-email-hint${error ? " verification-email-error" : ""}`}
+        aria-describedby={`verification-email-hint${error ? " verification-email-error" : ""}${statusMessage ? " verification-email-status" : ""}`}
         placeholder="name@example.com"
         className="mt-3 h-12 aria-invalid:border-destructive"
       />
@@ -81,15 +124,23 @@ export function EmailVerificationForm() {
         </p>
       )}
 
-      <Button type="submit" className="mt-6 min-h-12 w-full whitespace-normal px-4 py-3">
-        Send verification code
+      <Button
+        type="submit"
+        disabled={isSubmitting}
+        className="mt-6 min-h-12 w-full whitespace-normal px-4 py-3"
+      >
+        {isSubmitting ? "Sending code..." : "Send verification code"}
       </Button>
 
-      <p role="status" className="mt-4 text-sm leading-6 text-muted-foreground">
-        {emailValidated
-          ? "Your email address is valid. Code delivery is not available yet; no code has been sent."
-          : "Code delivery will be available soon. You can check your email address here."}
-      </p>
+      {statusMessage && (
+        <p
+          id="verification-email-status"
+          role="status"
+          className="mt-4 text-sm leading-6 text-muted-foreground"
+        >
+          {statusMessage}
+        </p>
+      )}
     </form>
   );
 }
