@@ -1,8 +1,33 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ticketSubmissionRateLimit, otpRateLimit } from "@/lib/rate-limit";
+import {
+  checkAuthRateLimit,
+  ticketSubmissionRateLimit,
+  otpRequestRateLimit,
+  otpVerifyRateLimit,
+} from "@/lib/rate-limit";
+import { ADMIN_COOKIE_NAME, verifyAdminToken } from "@/lib/admin-token";
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdminApi = pathname === "/api/admin" || pathname.startsWith("/api/admin/");
+  // The API contract keeps login and logout public, even for invalid sessions.
+  const isPublicAdminRoute =
+    pathname === "/admin/login" ||
+    pathname === "/api/admin/login" ||
+    pathname === "/api/admin/logout";
+
+  if ((isAdminPage || isAdminApi) && !isPublicAdminRoute) {
+    const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+    if (!token || !verifyAdminToken(token)) {
+      if (isAdminApi) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+  }
+
   // Only apply rate limiting to ticket submissions (POST requests)
   if (
     request.nextUrl.pathname.startsWith("/api/tickets") ||
@@ -56,11 +81,12 @@ export async function proxy(request: NextRequest) {
       const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
       try {
-        if (!otpRateLimit) {
-          return NextResponse.next();
-        }
-
-        const { success, limit, reset, remaining } = await otpRateLimit.limit(ip);
+        const limiter = pathname === "/api/otp/verify" || pathname === "/api/otp/verify/"
+          ? otpVerifyRateLimit
+          : otpRequestRateLimit;
+        const result = await checkAuthRateLimit(limiter, ip);
+        if (!result) return NextResponse.next();
+        const { success, limit, reset, remaining } = result;
 
         if (!success) {
           return new NextResponse(
@@ -83,9 +109,12 @@ export async function proxy(request: NextRequest) {
         response.headers.set("X-RateLimit-Reset", reset.toString());
 
         return response;
-      } catch (error) {
-        console.error("OTP rate limiting error:", error);
-        return NextResponse.next();
+      } catch {
+        console.error("OTP rate limiting is unavailable");
+        return NextResponse.json(
+          { error: "Something went wrong. Please try again." },
+          { status: 500 },
+        );
       }
     }
   }
@@ -95,6 +124,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
     "/api/tickets/:path*",
     "/submit-ticket/:path*",
     "/api/otp/:path*",

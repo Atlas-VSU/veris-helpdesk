@@ -14,7 +14,8 @@ paths:
       description: >
         Always returns the same success response regardless of whether the
         email has tickets. A code is sent only when the email has at least one
-        ticket. Emails are compared case-insensitively.
+        ticket. Emails are compared case-insensitively. Requests are limited
+        to 5 per 5 minutes per IP, independently of code verification.
       requestBody:
         required: true
         content:
@@ -56,7 +57,9 @@ paths:
       description: >
         Codes contain 6 digits, expire after 10 minutes, allow at most 5 wrong
         tries, and may be resent every 60 seconds. Successful verification sets
-        the client_session cookie.
+        the client_session cookie. Verification is limited to 10 requests per
+        5 minutes per IP, independently of code requests. The 5-wrong-tries
+        limit still applies separately to each code.
       requestBody:
         required: true
         content:

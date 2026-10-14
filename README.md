@@ -151,7 +151,9 @@ Clients have no accounts. They prove they own an email with a one-time code, and
 
 **Emails are saved in lowercase** (the Zod schemas trim and lowercase them), so `John@Mail.com` and `john@mail.com` are the same person.
 
-**Rate limits** (Upstash, per IP, only active when the Upstash env vars are set): login 5 per minute, ticket submission 5 per hour, OTP 5 per 5 minutes. They are set in `lib/rate-limit.ts` and applied by `proxy.ts` and the login route.
+**Rate limits** (Upstash, per IP): login 5 per minute, ticket submission 5 per hour, OTP code requests 5 per 5 minutes, and OTP verification 10 per 5 minutes. They are set in `lib/rate-limit.ts`. Login is limited in its route; OTP request and verification use independent quotas enforced only in `proxy.ts`. The OTP resend wait and five wrong attempts per code are separate checks required by the API contract.
+
+In production, login and OTP return a JSON `500` before processing the request if Upstash credentials are missing, Redis fails, or the rate-limit check times out. Exceeding a working quota returns `429`. Development can run without Redis; ticket submissions retain their existing fallback when Redis is unavailable.
 
 ---
 
@@ -220,13 +222,15 @@ supabase db push
    SUPABASE_URL=
    SUPABASE_SECRET_KEY=           # service-role key, server only
    JWT_SECRET=                    # signs the client_session and admin_session cookies
-   UPSTASH_REDIS_REST_URL=        # optional: rate limiting is off without these two
+   UPSTASH_REDIS_REST_URL=        # required in production for login and OTP
    UPSTASH_REDIS_REST_TOKEN=
    GMAIL_USER=                    # sender account for OTP emails
    GMAIL_APP_PASSWORD=            # a Google "app password", not the account password
 ```
 
    > Env vars change frequently as new features are added (Gmail app password, JWT secret, etc.) — always check the group for the latest values rather than relying on old ones you may have saved locally.
+
+   Use the REST URL and token from the project's Upstash Redis database. The token needs write access for rate limiting. Set both variables in `.env.local` and in the deployment's production environment, then restart or redeploy. Verify the connection with `node scripts/check-upstash.cjs`; it uses a separate expiring test key and does not consume login or OTP quotas.
 
    Without the two Gmail variables the OTP email is not sent. In development the code is also printed in the terminal that runs `npm run dev`, so you can still test the flow.
 
@@ -251,7 +255,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 2. `POST /api/otp/request` with `{ "email": "..." }`. The code appears in the `npm run dev` terminal (and in the inbox if Gmail is set up).
 3. `POST /api/otp/verify` with `{ "email": "...", "code": "123456" }`. A correct code returns `200` and a `set-cookie: client_session=...` header.
 
-If the Upstash variables are set, OTP calls are limited to 5 per 5 minutes per IP, so a plain `429 "Too many OTP requests"` while testing means wait a few minutes.
+If the Upstash variables are set, OTP code requests are limited to 5 per 5 minutes per IP and verification to 10 per 5 minutes per IP, with independent counters. A generic `429` means that endpoint's IP quota is exhausted; `OTP_LOCKED` means the code's five wrong attempts were used.
 
 ---
 
