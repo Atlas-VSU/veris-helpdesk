@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { checkAuthRateLimit, ticketSubmissionRateLimit, otpRateLimit } from "@/lib/rate-limit";
+import {
+  checkAuthRateLimit,
+  ticketSubmissionRateLimit,
+  otpRequestRateLimit,
+  otpVerifyRateLimit,
+} from "@/lib/rate-limit";
 import { ADMIN_COOKIE_NAME, verifyAdminToken } from "@/lib/admin-token";
 
 export async function proxy(request: NextRequest) {
@@ -76,7 +81,10 @@ export async function proxy(request: NextRequest) {
       const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
       try {
-        const result = await checkAuthRateLimit(otpRateLimit, ip);
+        const limiter = pathname === "/api/otp/verify" || pathname === "/api/otp/verify/"
+          ? otpVerifyRateLimit
+          : otpRequestRateLimit;
+        const result = await checkAuthRateLimit(limiter, ip);
         if (!result) return NextResponse.next();
         const { success, limit, reset, remaining } = result;
 

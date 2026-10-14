@@ -151,7 +151,7 @@ Clients have no accounts. They prove they own an email with a one-time code, and
 
 **Emails are saved in lowercase** (the Zod schemas trim and lowercase them), so `John@Mail.com` and `john@mail.com` are the same person.
 
-**Rate limits** (Upstash, per IP): login 5 per minute, ticket submission 5 per hour, OTP 5 per 5 minutes. They are set in `lib/rate-limit.ts`. Login is limited in its route; OTP request and verification share one quota enforced only in `proxy.ts`. The OTP resend wait and verification attempt limit are separate checks required by the API contract.
+**Rate limits** (Upstash, per IP): login 5 per minute, ticket submission 5 per hour, OTP code requests 5 per 5 minutes, and OTP verification 10 per 5 minutes. They are set in `lib/rate-limit.ts`. Login is limited in its route; OTP request and verification use independent quotas enforced only in `proxy.ts`. The OTP resend wait and five wrong attempts per code are separate checks required by the API contract.
 
 In production, login and OTP return a JSON `500` before processing the request if Upstash credentials are missing, Redis fails, or the rate-limit check times out. Exceeding a working quota returns `429`. Development can run without Redis; ticket submissions retain their existing fallback when Redis is unavailable.
 
@@ -255,7 +255,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 2. `POST /api/otp/request` with `{ "email": "..." }`. The code appears in the `npm run dev` terminal (and in the inbox if Gmail is set up).
 3. `POST /api/otp/verify` with `{ "email": "...", "code": "123456" }`. A correct code returns `200` and a `set-cookie: client_session=...` header.
 
-If the Upstash variables are set, OTP calls are limited to 5 per 5 minutes per IP, so a plain `429 "Too many OTP requests"` while testing means wait a few minutes.
+If the Upstash variables are set, OTP code requests are limited to 5 per 5 minutes per IP and verification to 10 per 5 minutes per IP, with independent counters. A generic `429` means that endpoint's IP quota is exhausted; `OTP_LOCKED` means the code's five wrong attempts were used.
 
 ---
 

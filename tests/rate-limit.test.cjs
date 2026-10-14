@@ -21,7 +21,7 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
   });
   t.mock.method(console, "error", () => {});
 
-  function setup({ mode = "production", url = "https://redis.example", token = "test-token", response = healthy, rejects = false, invalidConfig = false } = {}) {
+  function setup({ mode = "production", url = "https://redis.example", token = "test-token", response = healthy, rejects = false, invalidConfig = false, enforceQuota = false } = {}) {
     process.env.NODE_ENV = mode;
     for (const [name, value] of [["UPSTASH_REDIS_REST_URL", url], ["UPSTASH_REDIS_REST_TOKEN", token]]) {
       if (value === null) delete process.env[name];
@@ -29,6 +29,7 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
     }
     const calls = [];
     const constructors = [];
+    const counts = new Map();
     const rateLimits = loadTs("lib/rate-limit.ts", {
       "@upstash/redis": {
         Redis: class {
@@ -45,7 +46,16 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
           async limit(identifier) {
             calls.push({ prefix: this.options.prefix, identifier });
             if (rejects) throw new Error("Redis failed: private credential details");
-            return response;
+            const limit = this.options.limiter.limit;
+            if (enforceQuota) {
+              const key = `${this.options.prefix}:${identifier}`;
+              const used = (counts.get(key) ?? 0) + 1;
+              counts.set(key, used);
+              return { ...healthy, limit, success: used <= limit, remaining: Math.max(0, limit - used) };
+            }
+            return response === healthy
+              ? { ...healthy, limit, remaining: limit - 1 }
+              : { ...response, limit };
           }
         },
       },
@@ -87,12 +97,13 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
     }
   }
 
-  await t.test("initializes separate login, OTP, and ticket quotas on one Redis client", () => {
+  await t.test("initializes separate login, ticket, OTP request and verification quotas", () => {
     const api = setup({ url: " https://redis.example ", token: " test-token " });
     assert.deepEqual(api.constructors.map(({ prefix, limiter }) => [prefix, limiter]), [
       ["ratelimit:login", { limit: 5, window: "60 s" }],
       ["ratelimit:ticket", { limit: 5, window: "1 h" }],
-      ["ratelimit:otp", { limit: 5, window: "5 m" }],
+      ["ratelimit:otp:request", { limit: 5, window: "5 m" }],
+      ["ratelimit:otp:verify", { limit: 10, window: "5 m" }],
     ]);
     assert.equal(api.constructors[0].redis, api.constructors[2].redis);
     assert.deepEqual(api.constructors[0].redis.options, { url: "https://redis.example", token: "test-token" });
@@ -121,14 +132,77 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
   await t.test("quota exhaustion returns 429 and OTP rate-limit headers", async () => {
     const api = setup({ response: { ...healthy, success: false, remaining: 0 } });
     await assertBlocked(api, 429);
-    const response = await api.proxy(request(otpPaths[0]));
-    assert.equal(response.headers.get("x-ratelimit-limit"), "5");
-    assert.equal(response.headers.get("x-ratelimit-remaining"), "0");
-    assert.equal(response.headers.get("x-ratelimit-reset"), String(healthy.reset));
+    for (const pathname of otpPaths) {
+      const response = await api.proxy(request(pathname));
+      assert.equal(response.headers.get("x-ratelimit-limit"), pathname.endsWith("/request") ? "5" : "10");
+      assert.equal(response.headers.get("x-ratelimit-remaining"), "0");
+      assert.equal(response.headers.get("x-ratelimit-reset"), String(healthy.reset));
+    }
   });
 
   await t.test("cached blocks still return 429", async () => {
     await assertBlocked(setup({ response: { ...healthy, success: false, reason: "cacheBlock" } }), 429);
+  });
+
+  await t.test("request and verification quotas are independent for the same IP", async () => {
+    const api = setup({ enforceQuota: true });
+    for (let count = 0; count < 5; count++) {
+      assert.equal((await api.proxy(request("/api/otp/request"))).headers.get("x-middleware-next"), "1");
+    }
+    assert.equal((await api.proxy(request("/api/otp/request"))).status, 429);
+    for (let count = 0; count < 10; count++) {
+      const response = await api.proxy(request("/api/otp/verify"));
+      assert.equal(response.headers.get("x-middleware-next"), "1");
+      assert.equal(response.headers.get("x-ratelimit-limit"), "10");
+    }
+    assert.equal((await api.proxy(request("/api/otp/verify"))).status, 429);
+    const otherApi = setup({ enforceQuota: true });
+    for (let count = 0; count < 10; count++) await otherApi.proxy(request("/api/otp/verify"));
+    assert.equal((await otherApi.proxy(request("/api/otp/request"))).headers.get("x-middleware-next"), "1");
+    assert.equal((await otherApi.proxy(request("/api/otp/verify/"))).status, 429);
+  });
+
+  await t.test("requesting a code leaves room for all five wrong verification attempts", async () => {
+    const api = setup({ enforceQuota: true });
+    assert.equal((await api.proxy(request("/api/otp/request"))).headers.get("x-middleware-next"), "1");
+    let attempts = 0;
+    let codeChecks = 0;
+    const otpId = "00000000-0000-0000-0000-000000000001";
+    const client = createClient("https://database.example", "test-key", {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: {
+        fetch: async (url, options) => {
+          let rows;
+          if (options.method === "GET") {
+            rows = [{ id: otpId, code: "stored-hash", attempts, expires_at: new Date(Date.now() + 600000).toISOString() }];
+          } else {
+            assert.equal(options.method, "PATCH");
+            assert.equal(new URL(url).searchParams.get("attempts"), `eq.${attempts}`);
+            const update = JSON.parse(options.body);
+            assert.deepEqual(update, { attempts: attempts + 1 });
+            attempts = update.attempts;
+            rows = [{ id: otpId }];
+          }
+          return new Response(JSON.stringify(rows), { headers: { "Content-Type": "application/json" } });
+        },
+      },
+    });
+    const { POST } = loadTs("app/api/otp/verify/route.ts", {
+      ...api.mocks,
+      "@/lib/supabase-server": { getSupabaseServerClient: () => client },
+      "@/lib/otp": { OTP_MAX_ATTEMPTS: 5, checkOtpCode: async () => { codeChecks++; return false; } },
+    });
+    for (let count = 1; count <= 5; count++) {
+      const verification = request("/api/otp/verify", "POST", JSON.stringify({ email: "client@example.com", code: "000000" }));
+      const proxyResponse = await api.proxy(verification);
+      assert.equal(proxyResponse.headers.get("x-middleware-next"), "1", `Attempt ${count} must reach the handler`);
+      assert.equal(proxyResponse.headers.get("x-ratelimit-remaining"), String(10 - count));
+      const response = await POST(verification);
+      assert.equal(response.status, count === 5 ? 429 : 401);
+      assert.equal((await response.json()).code, count === 5 ? "OTP_LOCKED" : "OTP_WRONG");
+    }
+    assert.equal(attempts, 5);
+    assert.equal(codeChecks, 5);
   });
 
   await t.test("healthy login and OTP each consume exactly one quota check", async () => {
@@ -143,7 +217,7 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
       const otpRequest = request(pathname, "POST", JSON.stringify({ email: "client@example.com", code: "123456" }));
       const proxyResponse = await api.proxy(otpRequest);
       assert.equal(proxyResponse.headers.get("x-middleware-next"), "1");
-      assert.equal(proxyResponse.headers.get("x-ratelimit-remaining"), "4");
+      assert.equal(proxyResponse.headers.get("x-ratelimit-remaining"), pathname.endsWith("/request") ? "4" : "9");
       const checksAfterProxy = api.calls.length;
       const client = createClient("https://database.example", "test-key", {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -159,7 +233,10 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
       assert.equal((await routeResponse.json()).code, pathname.endsWith("/request") ? "OTP_RESEND_WAIT" : "OTP_EXPIRED");
       assert.equal(api.calls.length, checksAfterProxy, "OTP handlers must not charge the quota again");
     }
-    assert.deepEqual(api.calls.slice(1), otpPaths.map(() => ({ prefix: "ratelimit:otp", identifier: ip })));
+    assert.deepEqual(api.calls.slice(1), [
+      { prefix: "ratelimit:otp:request", identifier: ip },
+      { prefix: "ratelimit:otp:verify", identifier: ip },
+    ]);
   });
 
   await t.test("development retains its fallback without Redis or during failure", async () => {

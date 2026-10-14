@@ -16,7 +16,7 @@ test("admin route and server authentication", async (t) => {
   });
   const { verifyAdminToken } = loadTs("lib/admin-token.ts");
   const { proxy, config } = loadTs("proxy.ts", {
-    "@/lib/rate-limit": { ticketSubmissionRateLimit: null, otpRateLimit: null },
+    "@/lib/rate-limit": { ticketSubmissionRateLimit: null, otpRequestRateLimit: null, otpVerifyRateLimit: null },
   });
   const sign = (payload, options = {}) => jwt.sign(payload, secret, options);
   const adminToken = sign({ adminId: "admin-123" }, { expiresIn: "24h" });

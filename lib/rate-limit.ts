@@ -32,11 +32,19 @@ export const ticketSubmissionRateLimit = redis
     })
   : null;
 
-export const otpRateLimit = redis
+export const otpRequestRateLimit = redis
   ? new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(5, "5 m"),
-      prefix: "ratelimit:otp",
+      prefix: "ratelimit:otp:request",
+    })
+  : null;
+
+export const otpVerifyRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, "5 m"),
+      prefix: "ratelimit:otp:verify",
     })
   : null;
 
