@@ -47,10 +47,10 @@ export function TicketSuccessState({ ticketNumber, email, subject, service, prio
         </div>
       </div>
 
-      <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-        <Link className="rounded-lg bg-[var(--palette-dark-olive)] px-6 py-3 text-sm font-bold text-[var(--palette-white)] transition-colors hover:bg-[var(--palette-moss)]" href="/tickets">View Ticket</Link>
-        <Button className="bg-[var(--palette-off-white)] px-6 py-3 text-[var(--palette-dark-olive)] hover:bg-[var(--palette-stone)]" onClick={onSubmitAnother} type="button">Submit Another</Button>
-        <Link className="rounded-lg border border-[var(--palette-stone)] px-6 py-3 text-sm font-bold text-[var(--palette-dark-olive)] transition-colors hover:border-[var(--palette-dark-olive)] hover:text-[var(--palette-dark-olive)]" href="/">Return Home</Link>
+      <div className="mt-8 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link className="flex min-h-11 items-center justify-center rounded-lg bg-[var(--palette-dark-olive)] px-6 py-3 text-sm font-bold text-[var(--palette-white)] transition-colors hover:bg-[var(--palette-moss)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--palette-moss)] sm:col-span-2" href="/verify">Verify email to track your ticket</Link>
+        <Button className="h-auto min-h-11 w-full bg-[var(--palette-off-white)] px-6 py-3 text-[var(--palette-dark-olive)] hover:bg-[var(--palette-stone)]" onClick={onSubmitAnother} type="button">Submit another</Button>
+        <Link className="flex min-h-11 items-center justify-center rounded-lg border border-[var(--palette-stone)] px-6 py-3 text-sm font-bold text-[var(--palette-dark-olive)] transition-colors hover:border-[var(--palette-dark-olive)] hover:text-[var(--palette-dark-olive)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--palette-moss)]" href="/">Return home</Link>
       </div>
     </div>
   );
