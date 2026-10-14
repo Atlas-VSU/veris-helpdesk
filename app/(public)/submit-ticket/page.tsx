@@ -10,6 +10,7 @@ export default function SubmitTicketPage() {
     fileName,
     isSubmitting,
     hasSubmitted,
+    ticketNumber,
     submittedData,
     error,
     handleInputChange,
@@ -20,8 +21,16 @@ export default function SubmitTicketPage() {
     handleMakeAnotherTicket,
   } = useSubmitTicket();
 
-  const content = hasSubmitted && submittedData ? (
-    <TicketSuccessState description={submittedData.description} email={submittedData.email} onSubmitAnother={handleMakeAnotherTicket} />
+  const content = hasSubmitted && ticketNumber && submittedData ? (
+    <TicketSuccessState
+      ticketNumber={ticketNumber}
+      email={submittedData.email}
+      subject={submittedData.subject}
+      service={submittedData.service}
+      priority={submittedData.priority}
+      description={submittedData.description}
+      onSubmitAnother={handleMakeAnotherTicket}
+    />
   ) : (
     <div className="mx-auto max-w-3xl">
       <div className="mb-10 text-center">
