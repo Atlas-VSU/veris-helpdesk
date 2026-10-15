@@ -2,7 +2,7 @@ import { EmailVerificationFlow } from "@/features/tickets/components/email-verif
 
 export default function VerifyPage() {
   return (
-    <main className="mx-auto w-full max-w-xl px-4 py-10 sm:px-6 sm:py-16">
+    <main className="mx-auto min-w-0 w-full max-w-xl overflow-x-clip px-4 py-10 sm:px-6 sm:py-16">
       <header className="mb-8 text-center">
         <h1 className="font-serif text-3xl font-semibold text-[var(--palette-dark-olive)] sm:text-4xl">
           Verify your email

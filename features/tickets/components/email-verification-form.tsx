@@ -81,6 +81,9 @@ export function EmailVerificationForm({ onCodeRequested }: EmailVerificationForm
         }
 
         setError(getRequestError(response.status, payload));
+        if (response.status === 400) {
+          window.requestAnimationFrame(() => emailRef.current?.focus());
+        }
         return;
       }
 
@@ -106,7 +109,7 @@ export function EmailVerificationForm({ onCodeRequested }: EmailVerificationForm
       onSubmit={handleSubmit}
       aria-label="Email verification"
       aria-busy={isSubmitting}
-      className="rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-soft sm:p-10"
+      className="min-w-0 rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-soft sm:p-10"
     >
       <div className="mb-6 flex size-14 items-center justify-center rounded-full border border-border bg-[var(--palette-moss)]/10 text-primary">
         <Mail aria-hidden="true" className="size-6" />
@@ -119,6 +122,7 @@ export function EmailVerificationForm({ onCodeRequested }: EmailVerificationForm
         Use the email address you provided when submitting your ticket.
       </p>
       <Input
+        autoFocus
         ref={emailRef}
         id="verification-email"
         name="email"
@@ -151,8 +155,12 @@ export function EmailVerificationForm({ onCodeRequested }: EmailVerificationForm
         disabled={isSubmitting}
         className="mt-6 min-h-12 w-full whitespace-normal px-4 py-3"
       >
-        {isSubmitting ? "Sending code..." : "Send verification code"}
+        {isSubmitting ? "Sending code…" : "Send verification code"}
       </Button>
+
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {isSubmitting ? "Sending code…" : ""}
+      </p>
     </form>
   );
 }
