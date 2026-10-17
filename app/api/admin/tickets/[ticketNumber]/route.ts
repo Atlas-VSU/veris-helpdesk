@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin-auth";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { adminTicketUpdateSchema, ticketNumberSchema } from "@/features/admin/schemas/ticket";
+import { adminTicketUpdateSchema } from "@/features/admin/schemas/ticket";
+import { ticketNumberSchema } from "@/features/tickets/schemas/ticket";
 
 export async function PATCH(
   request: Request,
