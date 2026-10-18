@@ -155,6 +155,7 @@ export function OtpVerificationForm({
         } else if (nextError.kind === "wrong" || nextError.kind === "invalid-input") {
           window.requestAnimationFrame(() => codeRef.current?.focus());
         }
+        setIsSubmitting(false);
         return;
       }
 
@@ -175,7 +176,6 @@ export function OtpVerificationForm({
         kind: "fallback",
         message: "We couldn't reach the verification service. Check your connection and try again.",
       });
-    } finally {
       setIsSubmitting(false);
     }
   }
