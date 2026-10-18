@@ -181,6 +181,8 @@ export function OtpVerificationForm({
   }
 
   const isBusy = isSubmitting || isResending;
+  const hasCodeInputError =
+    verificationError?.kind === "wrong" || verificationError?.kind === "invalid-input";
 
   return (
     <form
@@ -225,14 +227,11 @@ export function OtpVerificationForm({
           value={code}
           onChange={(event) => {
             setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-            if (
-              verificationError?.kind === "wrong" ||
-              verificationError?.kind === "invalid-input"
-            ) {
+            if (hasCodeInputError) {
               setVerificationError(null);
             }
           }}
-          aria-invalid={Boolean(verificationError)}
+          aria-invalid={hasCodeInputError}
           aria-describedby={`verification-code-hint verification-code-status${verificationError ? " verification-code-error" : ""}`}
           placeholder="000000"
           className="mt-3 h-14 text-center font-mono text-2xl tracking-[0.5em] tabular-nums aria-invalid:border-destructive"
