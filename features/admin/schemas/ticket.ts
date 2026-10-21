@@ -17,8 +17,6 @@ export const adminTicketsQuerySchema = z.object({
   message: "Page is out of range",
 });
 
-export const ticketNumberSchema = z.string().regex(/^TCK-[0-9]{4}-[0-9]{5}$/);
-
 export const adminTicketUpdateSchema = z.object({
   status: statusEnum.optional(),
   priority: priorityEnum.optional(),
