@@ -3,6 +3,9 @@ import { z } from "zod";
 
 export const userTypeEnum = z.enum(["subscriber", "student"]);
 export const priorityEnum = z.enum(["low", "medium", "high", "urgent"]);
+export const ticketNumberSchema = z
+  .string()
+  .regex(/^TCK-[0-9]{4}-[0-9]{5}$/, "Invalid ticket number");
 
 export const createTicketSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
@@ -20,7 +23,7 @@ export const createTicketSchema = z.object({
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 
 export const viewTicketSchema = z.object({
-  ticket_number: z.string().min(1, "Ticket number is required"),
+  ticket_number: ticketNumberSchema,
   email: z.string().trim().toLowerCase().email("Invalid email address"),
 });
 
