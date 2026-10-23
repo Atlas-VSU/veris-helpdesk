@@ -7,6 +7,7 @@ import { TicketSuccessState } from "@/features/submit-ticket/components/ticket-s
 export default function SubmitTicketPage() {
   const {
     formData,
+    errors,
     fileName,
     isSubmitting,
     hasSubmitted,
@@ -46,6 +47,7 @@ export default function SubmitTicketPage() {
 
       <TicketForm
         formData={formData}
+        errors={errors}
         fileName={fileName}
         isSubmitting={isSubmitting}
         onCancel={handleMakeAnotherTicket}
