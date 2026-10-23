@@ -15,6 +15,11 @@ export type TicketFormData = {
   consent: boolean;
 };
 
+export type TicketFormErrors = Partial<Record<
+  "fullName" | "email" | "service" | "subject" | "description" | "priority" | "consent",
+  string
+>>;
+
 export type FileUploadFieldProps = {
   fileName: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -22,6 +27,7 @@ export type FileUploadFieldProps = {
 
 export type TicketFormProps = {
   formData: TicketFormData;
+  errors: TicketFormErrors;
   fileName: string;
   isSubmitting: boolean;
   onInputChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -44,7 +50,7 @@ export type TicketSuccessStateProps = {
 
 export type FieldWithLabelProps = {
   id: string;
-  label: string;
+  label: ReactNode;
   children: ReactNode;
   withSelectIcon?: boolean;
 };

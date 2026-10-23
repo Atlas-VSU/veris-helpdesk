@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useRef, useState } from "react";
-import type { TicketFormData } from "@/features/submit-ticket/types/types";
+import type { TicketFormData, TicketFormErrors } from "@/features/submit-ticket/types/types";
 
 import { submitTicketAction } from "../actions";
 
@@ -19,6 +19,7 @@ const initialFormData: TicketFormData = {
 
 export function useSubmitTicket() {
   const [formData, setFormData] = useState<TicketFormData>(initialFormData);
+  const [errors, setErrors] = useState<TicketFormErrors>({});
   const [fileName, setFileName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -31,15 +32,33 @@ export function useSubmitTicket() {
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
     setFormData((current) => ({ ...current, [name]: value }));
+    setErrors((current) => {
+      if (!(name in current)) return current;
+      const next = { ...current };
+      delete next[name as keyof TicketFormErrors];
+      return next;
+    });
   }
 
   function handleSelectChange(event: ChangeEvent<HTMLSelectElement>) {
     const { name, value } = event.target;
     setFormData((current) => ({ ...current, [name]: value } as TicketFormData));
+    setErrors((current) => {
+      if (!(name in current)) return current;
+      const next = { ...current };
+      delete next[name as keyof TicketFormErrors];
+      return next;
+    });
   }
 
   function handleConsentChange(event: ChangeEvent<HTMLInputElement>) {
     setFormData((current) => ({ ...current, consent: event.target.checked }));
+    setErrors((current) => {
+      if (!current.consent) return current;
+      const next = { ...current };
+      delete next.consent;
+      return next;
+    });
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -51,10 +70,31 @@ export function useSubmitTicket() {
     event.preventDefault();
     if (submissionPending.current) return;
 
+    const nextErrors: TicketFormErrors = {};
+    const trimmedEmail = formData.email.trim();
+
+    if (!formData.fullName.trim()) nextErrors.fullName = "Full name is required.";
+    if (!trimmedEmail) {
+      nextErrors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+    if (!formData.service) nextErrors.service = "Please select a service.";
+    if (!formData.subject.trim()) nextErrors.subject = "Subject is required.";
+    if (!formData.description.trim()) nextErrors.description = "Description is required.";
+    if (!formData.priority) nextErrors.priority = "Please select a priority.";
+    if (!formData.consent) nextErrors.consent = "You must agree to the privacy policy.";
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
     submissionPending.current = true;
     formRef.current = event.currentTarget;
     setIsSubmitting(true);
     setError(null);
+    setErrors({});
     setHasSubmitted(false);
     setTicketNumber(null);
     setSubmittedData(null);
@@ -111,12 +151,14 @@ export function useSubmitTicket() {
     setFileName("");
     setHasSubmitted(false);
     setError(null);
+    setErrors({});
     setTicketNumber(null);
     setSubmittedData(null);
   }
 
   return {
     formData,
+    errors,
     fileName,
     isSubmitting,
     hasSubmitted,

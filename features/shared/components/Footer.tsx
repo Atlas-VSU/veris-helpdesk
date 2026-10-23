@@ -19,6 +19,13 @@ export function Footer() {
           Privacy & Policy
         </Link>
 
+        <Link
+          href="/faq"
+          className="justify-self-start text-sm font-medium text-[var(--palette-dark-olive)] transition-colors hover:text-[var(--palette-terracotta)] sm:col-start-2 sm:row-start-2 sm:justify-self-center"
+        >
+          FAQ
+        </Link>
+
         <p className="col-span-2 justify-self-center text-center text-xs text-[var(--palette-gray-olive)] sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:justify-self-end sm:text-right">
           {"\u00A9"} {new Date().getFullYear()} VERIS Systems. All rights reserved.
         </p>
