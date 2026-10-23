@@ -38,8 +38,8 @@ export const clientTicketDetailSchema = z.object({
   consent_given: z.boolean(),
   created_at: z.string().datetime({ offset: true }),
   updated_at: z.string().datetime({ offset: true }),
-  messages: z.array(ticketMessageSchema),
-  attachments: z.array(ticketAttachmentSchema),
+  messages: z.array(ticketMessageSchema).default([]),
+  attachments: z.array(ticketAttachmentSchema).default([]),
 });
 
 export const clientTicketDetailResponseSchema = z.object({
