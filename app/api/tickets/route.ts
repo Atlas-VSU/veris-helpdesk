@@ -1,26 +1,14 @@
 import { NextResponse } from "next/server";
+import { createTicketSchema } from "@/features/tickets/schemas/ticket";
 import { getClientEmail } from "@/lib/client-auth";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import type { TicketStatus } from "@/types/database";
-
-const ticketStatuses: TicketStatus[] = [
-  "new",
-  "open",
-  "in_progress",
-  "waiting_for_client",
-  "resolved",
-  "closed",
-];
+import type { PublicTicket } from "@/features/tickets/types/ticket-list";
+import {
+  escapeLikePattern,
+  isTicketStatus,
+} from "@/features/tickets/utils/ticket-list";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "private, no-store" };
-
-function isTicketStatus(value: string): value is TicketStatus {
-  return ticketStatuses.includes(value as TicketStatus);
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, "\\$&");
-}
 
 export async function GET(request: Request) {
   try {
@@ -44,11 +32,10 @@ export async function GET(request: Request) {
     }
 
     const requestedStatus = status && isTicketStatus(status) ? status : undefined;
-    const emailPattern = escapeLikePattern(verifiedEmail);
     let query = getSupabaseServerClient()
       .from("tickets")
-      .select("*")
-      .ilike("email", emailPattern)
+      .select("id, ticket_number, subject, description, priority, status, service, created_at, updated_at")
+      .ilike("email", escapeLikePattern(verifiedEmail))
       .order("created_at", { ascending: false });
 
     if (requestedStatus) {
@@ -57,14 +44,15 @@ export async function GET(request: Request) {
 
     const { data, error } = await query;
     if (error) throw error;
+    const publicTickets = (data ?? []) as PublicTicket[];
 
     const tickets = search
-      ? data.filter((ticket) =>
+      ? publicTickets.filter((ticket) =>
           [ticket.subject, ticket.ticket_number].some((value) =>
             value.toLowerCase().includes(search),
           ),
         )
-      : data;
+      : publicTickets;
 
     return NextResponse.json(
       { data: tickets },
@@ -76,5 +64,35 @@ export async function GET(request: Request) {
       { error: "Unable to load tickets" },
       { status: 500, headers: PRIVATE_RESPONSE_HEADERS },
     );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const result = createTicketSchema.safeParse(body);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error.issues[0]?.message ?? "Invalid ticket data" },
+        { status: 400 },
+      );
+    }
+
+    const { data, error } = await getSupabaseServerClient()
+      .from("tickets")
+      .insert([result.data] as never[])
+      .select("ticket_number")
+      .single<{ ticket_number: string }>();
+
+    if (error) {
+      console.error("Ticket creation error:", error);
+      return NextResponse.json({ error: "Unable to submit ticket" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ticketNumber: data.ticket_number }, { status: 201 });
+  } catch (error) {
+    console.error("Ticket submission error:", error);
+    return NextResponse.json({ error: "Unable to submit ticket" }, { status: 500 });
   }
 }

@@ -4,55 +4,33 @@ import Link from "next/link";
 import { Search, Ticket as TicketIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
-import type { Ticket, TicketStatus } from "@/types/database";
-
-const statuses: Array<{ value: "" | TicketStatus; label: string }> = [
-  { value: "", label: "All statuses" },
-  { value: "new", label: "New" },
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In progress" },
-  { value: "waiting_for_client", label: "Waiting for you" },
-  { value: "resolved", label: "Resolved" },
-  { value: "closed", label: "Closed" },
-];
-
-const statusLabels: Record<TicketStatus, string> = {
-  new: "New",
-  open: "Open",
-  in_progress: "In progress",
-  waiting_for_client: "Waiting for you",
-  resolved: "Resolved",
-  closed: "Closed",
-};
-
-const priorityLabels = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  urgent: "Urgent",
-} as const;
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-  }).format(new Date(value));
-}
+import { Select } from "@/components/ui/select";
+import type { PublicTicket, TicketStatusFilter } from "@/features/tickets/types/ticket-list";
+import {
+  formatTicketDate,
+  priorityLabels,
+  statusLabels,
+  ticketStatusOptions,
+} from "@/features/tickets/utils/ticket-list";
 
 export default function TicketsPage() {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [status, setStatus] = useState<"" | TicketStatus>("");
+  const [tickets, setTickets] = useState<PublicTicket[]>([]);
+  const [status, setStatus] = useState<TicketStatusFilter>("");
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; requiresVerification: boolean } | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    if (search.trim()) params.set("q", search.trim());
+    const timeoutId = window.setTimeout(() => {
+      void loadTickets();
+    }, 300);
 
     async function loadTickets() {
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      if (search.trim()) params.set("q", search.trim());
       setIsLoading(true);
       setError(null);
 
@@ -60,10 +38,26 @@ export default function TicketsPage() {
         const response = await fetch(`/api/tickets?${params.toString()}`, {
           signal: controller.signal,
         });
-        const body = (await response.json()) as { data?: Ticket[]; error?: string };
+        let body: { data?: PublicTicket[]; error?: string } = {};
+        try {
+          body = (await response.json()) as { data?: PublicTicket[]; error?: string };
+        } catch {
+          body = {};
+        }
 
         if (!response.ok) {
-          throw new Error(body.error ?? "Unable to load tickets.");
+          if (response.status === 401) {
+            setError({
+              message: "Your session expired. Please verify your email again.",
+              requiresVerification: true,
+            });
+          } else {
+            setError({
+              message: "We couldn't load your tickets. Please try again.",
+              requiresVerification: false,
+            });
+          }
+          return;
         }
 
         setTickets(body.data ?? []);
@@ -71,19 +65,20 @@ export default function TicketsPage() {
         if (requestError instanceof DOMException && requestError.name === "AbortError") {
           return;
         }
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Unable to load tickets.",
-        );
+        setError({
+          message: "We couldn't load your tickets. Please check your connection and try again.",
+          requiresVerification: false,
+        });
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);
       }
     }
 
-    void loadTickets();
-    return () => controller.abort();
-  }, [search, status]);
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [retryNonce, search, status]);
 
   return (
     <main className="min-h-screen bg-[var(--palette-cream)] px-4 py-12 text-[var(--palette-charcoal-olive)] sm:px-6 md:px-12 md:py-16">
@@ -114,16 +109,16 @@ export default function TicketsPage() {
           </label>
           <label>
             <span className="sr-only">Filter tickets by status</span>
-            <NativeSelect
-              onChange={(event) => setStatus(event.target.value as "" | TicketStatus)}
+            <Select
+              onChange={(event) => setStatus(event.target.value as TicketStatusFilter)}
               value={status}
             >
-              {statuses.map((option) => (
+              {ticketStatusOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </label>
         </div>
 
@@ -135,10 +130,20 @@ export default function TicketsPage() {
 
         {!isLoading && error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-800">
-            <p>{error}</p>
-            <Link className="mt-3 inline-block font-semibold underline" href="/verify">
-              Verify your email
-            </Link>
+            <p>{error.message}</p>
+            {error.requiresVerification ? (
+              <Link className="mt-3 inline-block font-semibold underline" href="/verify">
+                Verify your email
+              </Link>
+            ) : (
+              <button
+                className="mt-3 inline-block font-semibold underline"
+                onClick={() => setRetryNonce((current) => current + 1)}
+                type="button"
+              >
+                Try again
+              </button>
+            )}
           </div>
         )}
 
@@ -163,8 +168,9 @@ export default function TicketsPage() {
         {!isLoading && !error && tickets.length > 0 && (
           <div className="grid gap-4">
             {tickets.map((ticket) => (
-              <article
-                className="rounded-2xl border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-5 shadow-soft md:p-6"
+              <Link
+                className="block rounded-2xl border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-5 shadow-soft transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)] md:p-6"
+                href={`/tickets/${encodeURIComponent(ticket.ticket_number)}`}
                 key={ticket.id}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -186,10 +192,10 @@ export default function TicketsPage() {
                 <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-[var(--palette-stone)] pt-4 text-xs text-[var(--palette-gray-olive)]">
                   <span>Priority: {priorityLabels[ticket.priority]}</span>
                   <span>Service: {ticket.service}</span>
-                  <span>Created: {formatDate(ticket.created_at)}</span>
-                  <span>Updated: {formatDate(ticket.updated_at)}</span>
+                  <span>Created: {formatTicketDate(ticket.created_at)}</span>
+                  <span>Updated: {formatTicketDate(ticket.updated_at)}</span>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         )}
