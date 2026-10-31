@@ -13,7 +13,6 @@ const initialFormData: TicketFormData = {
   subject: "",
   description: "",
   priority: "low",
-  contactMethod: "Email",
   consent: false,
 };
 

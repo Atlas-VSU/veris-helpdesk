@@ -1,8 +1,6 @@
 import type { TicketPriority, UserType } from "@/types/database";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 
-export type ContactMethod = "Email" | "Phone";
-
 export type TicketFormData = {
   fullName: string;
   email: string;
@@ -11,7 +9,6 @@ export type TicketFormData = {
   subject: string;
   description: string;
   priority: TicketPriority;
-  contactMethod: ContactMethod;
   consent: boolean;
 };
 

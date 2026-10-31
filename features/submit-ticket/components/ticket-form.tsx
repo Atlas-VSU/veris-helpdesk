@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Send, ShieldCheck } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +26,7 @@ export function TicketForm({
   onSubmit,
 }: TicketFormProps) {
   const errorMessage = (field: keyof typeof errors) => errors[field];
+  const [isPriorityHelpOpen, setIsPriorityHelpOpen] = useState(false);
 
   return (
     <form className="rounded-3xl border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-6 shadow-soft md:p-10" noValidate onSubmit={onSubmit}>
@@ -75,8 +79,8 @@ export function TicketForm({
                 <span className="flex items-center gap-2">
                   <span>Priority Level</span>
                   <span className="group relative">
-                    <button aria-label="Learn about priority levels" className="flex size-5 items-center justify-center rounded-full border border-[var(--palette-gray-olive)] text-xs font-bold text-[var(--palette-gray-olive)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)]" type="button">?</button>
-                    <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-64 -translate-x-1/2 rounded-lg bg-[var(--palette-dark-olive)] p-3 text-xs leading-5 text-[var(--palette-warm-white)] shadow-lg group-hover:block group-focus-within:block">
+                    <button aria-describedby="priority-help-tooltip" aria-expanded={isPriorityHelpOpen} aria-label="Learn about priority levels" className="flex size-5 items-center justify-center rounded-full border border-[var(--palette-gray-olive)] text-xs font-bold text-[var(--palette-gray-olive)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)]" onClick={() => setIsPriorityHelpOpen((open) => !open)} type="button">?</button>
+                    <span className={`absolute bottom-full left-1/2 z-10 mb-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-[var(--palette-dark-olive)] p-3 text-xs leading-5 text-[var(--palette-warm-white)] shadow-lg ${isPriorityHelpOpen ? "block" : "hidden"}`} id="priority-help-tooltip" role="tooltip">
                       <span className="block"><strong>Low:</strong> Minor issue with little or no impact.</span>
                       <span className="block"><strong>Medium:</strong> Standard request or issue affecting normal work.</span>
                       <span className="block"><strong>High:</strong> Important issue affecting a major feature or multiple users.</span>
@@ -96,12 +100,6 @@ export function TicketForm({
             </FieldWithLabel>
             {errorMessage("priority") && <p className="mt-1 text-xs text-red-700" id="priority-error">{errorMessage("priority")}</p>}
           </div>
-          <FieldWithLabel id="contactMethod" label="Preferred Contact Method" withSelectIcon>
-            <Select id="contactMethod" name="contactMethod" onChange={onSelectChange} value={formData.contactMethod}>
-              <option>Email</option>
-              <option>Phone</option>
-            </Select>
-          </FieldWithLabel>
         </div>
 
         <FileUploadField fileName={fileName} onChange={onFileChange} />
