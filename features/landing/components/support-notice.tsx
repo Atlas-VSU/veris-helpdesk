@@ -8,7 +8,7 @@ export function SupportNotice() {
           <strong className="text-[var(--palette-moss)]">
             Expected response time:
           </strong>{" "}
-          Under 4 hours.
+          Within 6-12 hours.
           <br />
           For emergencies, please call{" "}
           <a
