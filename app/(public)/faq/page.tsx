@@ -20,7 +20,7 @@ const faqItems = [
   {
     question: "How long does it take to receive a response?",
     answer:
-      "Response times depend on the priority and complexity of your request. Our support team reviews every ticket and will respond as soon as possible.",
+      "Our support team aims to respond within 6-12 hours.",
   },
   {
     question: "What file types can I attach?",
