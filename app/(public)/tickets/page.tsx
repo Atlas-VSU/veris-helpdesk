@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Search, Ticket as TicketIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { PublicTicket, TicketStatusFilter } from "@/features/tickets/types/ticket-list";
 import {
   formatTicketDate,
@@ -109,7 +109,7 @@ export default function TicketsPage() {
           </label>
           <label>
             <span className="sr-only">Filter tickets by status</span>
-            <Select
+            <NativeSelect
               onChange={(event) => setStatus(event.target.value as TicketStatusFilter)}
               value={status}
             >
@@ -118,7 +118,7 @@ export default function TicketsPage() {
                   {option.label}
                 </option>
               ))}
-            </Select>
+            </NativeSelect>
           </label>
         </div>
 
