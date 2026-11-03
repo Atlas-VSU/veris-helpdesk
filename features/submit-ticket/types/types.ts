@@ -1,8 +1,6 @@
 import type { TicketPriority, UserType } from "@/types/database";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 
-export type ContactMethod = "Email" | "Phone";
-
 export type TicketFormData = {
   fullName: string;
   email: string;
@@ -11,9 +9,13 @@ export type TicketFormData = {
   subject: string;
   description: string;
   priority: TicketPriority;
-  contactMethod: ContactMethod;
   consent: boolean;
 };
+
+export type TicketFormErrors = Partial<Record<
+  "fullName" | "email" | "service" | "subject" | "description" | "priority" | "consent",
+  string
+>>;
 
 export type FileUploadFieldProps = {
   fileName: string;
@@ -22,6 +24,7 @@ export type FileUploadFieldProps = {
 
 export type TicketFormProps = {
   formData: TicketFormData;
+  errors: TicketFormErrors;
   fileName: string;
   isSubmitting: boolean;
   onInputChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -44,7 +47,7 @@ export type TicketSuccessStateProps = {
 
 export type FieldWithLabelProps = {
   id: string;
-  label: string;
+  label: ReactNode;
   children: ReactNode;
   withSelectIcon?: boolean;
 };
