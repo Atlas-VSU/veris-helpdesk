@@ -14,7 +14,13 @@ test("admin route and server authentication", async (t) => {
     if (originalSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = originalSecret;
   });
-  const { verifyAdminToken } = loadTs("lib/admin-token.ts");
+  const {
+    ADMIN_COOKIE_NAME,
+    ADMIN_SESSION_SECONDS,
+    getAdminCookieOptions,
+    signAdminToken,
+    verifyAdminToken,
+  } = loadTs("lib/admin-token.ts");
   const { proxy, config } = loadTs("proxy.ts", {
     "@/lib/rate-limit": { ticketSubmissionRateLimit: null, otpRequestRateLimit: null, otpVerifyRateLimit: null },
   });
@@ -25,15 +31,17 @@ test("admin route and server authentication", async (t) => {
     ["malformed JWT", "invalid"],
     ["wrong signature", jwt.sign({ adminId: "admin-123" }, "wrong-secret")],
     ["expired JWT", sign({ adminId: "admin-123" }, { expiresIn: -1 })],
-    ["future JWT", sign({ adminId: "admin-123" }, { notBefore: "1h" })],
-    ["missing adminId", sign({ email: "admin@example.com" })],
-    ["empty adminId", sign({ adminId: "" })],
-    ["blank adminId", sign({ adminId: "  " })],
-    ["non-string adminId", sign({ adminId: 123 })],
-    ["client token", sign({ role: "client", email: "client@example.com" })],
-    ["client token containing adminId", sign({ role: "client", adminId: "admin-123" })],
+    ["missing expiration claim", sign({ adminId: "admin-123" })],
+    ["excessive session lifetime (>24h)", sign({ adminId: "admin-123" }, { expiresIn: "48h" })],
+    ["future JWT", sign({ adminId: "admin-123" }, { notBefore: "1h", expiresIn: "24h" })],
+    ["missing adminId", sign({ email: "admin@example.com" }, { expiresIn: "24h" })],
+    ["empty adminId", sign({ adminId: "" }, { expiresIn: "24h" })],
+    ["blank adminId", sign({ adminId: "  " }, { expiresIn: "24h" })],
+    ["non-string adminId", sign({ adminId: 123 }, { expiresIn: "24h" })],
+    ["client token", sign({ role: "client", email: "client@example.com" }, { expiresIn: "2h" })],
+    ["client token containing adminId", sign({ role: "client", adminId: "admin-123" }, { expiresIn: "24h" })],
     ["string payload", sign("admin-123")],
-    ["disallowed algorithm", sign({ adminId: "admin-123" }, { algorithm: "HS384" })],
+    ["disallowed algorithm", sign({ adminId: "admin-123" }, { algorithm: "HS384", expiresIn: "24h" })],
     ["unsigned JWT", sign({ adminId: "admin-123" }, { algorithm: "none" })],
   ];
   const request = (url, token, cookieName = "admin_session") => new NextRequest(`https://helpdesk.example${url}`, {
@@ -61,6 +69,23 @@ test("admin route and server authentication", async (t) => {
     for (const url of ["/admin", "/admin/tickets/TCK-2026-00001", "/api/admin/tickets"]) {
       assert.equal((await proxy(request(url, adminToken))).headers.get("x-middleware-next"), "1");
     }
+  });
+  await t.test("signAdminToken and cookie options enforce 24-hour session timeout", () => {
+    assert.equal(ADMIN_COOKIE_NAME, "admin_session");
+    assert.equal(ADMIN_SESSION_SECONDS, 86400);
+    const signed = signAdminToken({ adminId: "admin-456", email: "admin@example.com" });
+    const verified = verifyAdminToken(signed);
+    assert.equal(verified.adminId, "admin-456");
+    assert.equal(verified.email, "admin@example.com");
+    assert.equal(verified.exp - verified.iat, 86400);
+    assert.deepEqual(getAdminCookieOptions(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 86400,
+      path: "/",
+    });
+    assert.equal(getAdminCookieOptions(0).maxAge, 0);
   });
   await t.test("client cookie cannot authenticate admin", async () => {
     assert.equal((await proxy(request("/api/admin/tickets", adminToken, "client_session"))).status, 401);
