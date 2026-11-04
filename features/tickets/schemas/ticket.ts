@@ -6,6 +6,7 @@ export const priorityEnum = z.enum(["low", "medium", "high", "urgent"]);
 export const ticketNumberSchema = z
   .string()
   .regex(/^TCK-[0-9]{4}-[0-9]{5}$/, "Invalid ticket number");
+export const attachmentIdSchema = z.string().uuid("Invalid attachment ID");
 
 export const createTicketSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
