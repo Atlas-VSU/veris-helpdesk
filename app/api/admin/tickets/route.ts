@@ -2,16 +2,17 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin-auth";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { adminTicketsQuerySchema } from "@/features/admin/schemas/ticket";
+import { errorResponse, handleApiError } from "@/lib/api-error";
 
 export async function GET(request: Request) {
   if (!(await getAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse(401, "Unauthorized");
   }
 
   const params = new URL(request.url).searchParams;
   const result = adminTicketsQuerySchema.safeParse(Object.fromEntries(params));
   if (!result.success) {
-    return NextResponse.json({ error: "Invalid ticket filters or pagination" }, { status: 400 });
+    return errorResponse(400, "Invalid ticket filters or pagination");
   }
 
   try {
@@ -32,13 +33,12 @@ export async function GET(request: Request) {
 
     const start = (page - 1) * pageSize;
     const { data, count, error } = await query.range(start, start + pageSize - 1);
-    if (error?.code === "PGRST103") {
-      return NextResponse.json({ error: "Page is out of range" }, { status: 400 });
-    }
     if (error) throw error;
     return NextResponse.json({ data: data ?? [], page, pageSize, total: count ?? 0 });
   } catch (error) {
-    console.error("Admin ticket list error:", error);
-    return NextResponse.json({ error: "Unable to load tickets" }, { status: 500 });
+    return handleApiError(error, {
+      context: "Admin ticket list error",
+      fallbackMessage: "Unable to load tickets",
+    });
   }
 }

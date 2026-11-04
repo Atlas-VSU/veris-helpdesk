@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { AdminRow } from "@/types/database";
 import { checkAuthRateLimit, loginRateLimit } from "@/lib/rate-limit";
 import { adminLoginSchema } from "@/features/admin/schemas/admin";
+import { errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
@@ -12,39 +13,22 @@ export async function POST(request: Request) {
   try {
     const result = await checkAuthRateLimit(loginRateLimit, ip);
     if (result && !result.success) {
-      return NextResponse.json(
-        { error: "Too many login attempts. Please try again later" },
-        { status: 429 },
-      );
+      return errorResponse(429, "Too many login attempts. Please try again later");
     }
-  } catch {
-    console.error("Login rate limiting is unavailable");
-    return NextResponse.json(
-      { error: "Something went wrong. Please try again." },
-      { status: 500 },
-    );
-  }
-  let body: unknown;
-
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 },
-    );
-  }
-
-  const result = adminLoginSchema.safeParse(body);
-
-  if (!result.success) {
-    return NextResponse.json(
-      { error: result.error.issues[0].message },
-      { status: 400 },
-    );
+  } catch (error) {
+    return handleApiError(error, {
+      context: "Login rate limiting is unavailable",
+    });
   }
 
   try {
+    const body = await parseJsonBody(request);
+    const result = adminLoginSchema.safeParse(body);
+
+    if (!result.success) {
+      return errorResponse(400, result.error.issues[0].message);
+    }
+
     const { email, password } = result.data;
     const supabase = getSupabaseServerClient();
 
@@ -55,19 +39,13 @@ export async function POST(request: Request) {
       .single<AdminRow>();
 
     if (error || !admin) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 },
-      );
+      return errorResponse(401, "Invalid email or password");
     }
 
     const passwordMatches = await bcrypt.compare(password, admin.password_hash);
 
     if (!passwordMatches) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 },
-      );
+      return errorResponse(401, "Invalid email or password");
     }
 
     const jwtSecret = process.env.JWT_SECRET;
@@ -95,10 +73,6 @@ export async function POST(request: Request) {
 
     return response;
   } catch (err) {
-    console.error("Admin login error:", err);
-    return NextResponse.json(
-      { error: "Something went wrong. Please try again." },
-      { status: 500 },
-    );
+    return handleApiError(err, { context: "Admin login error" });
   }
 }

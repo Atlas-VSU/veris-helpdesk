@@ -6,6 +6,7 @@ import {
   escapeLikePattern,
   isTicketStatus,
 } from "@/features/tickets/utils/ticket-list";
+import { errorResponse, handleApiError } from "@/lib/api-error";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "private, no-store" };
 
@@ -13,10 +14,9 @@ export async function GET(request: Request) {
   try {
     const verifiedEmail = await getClientEmail();
     if (!verifiedEmail) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401, headers: PRIVATE_RESPONSE_HEADERS },
-      );
+      return errorResponse(401, "Unauthorized", {
+        headers: PRIVATE_RESPONSE_HEADERS,
+      });
     }
 
     const { searchParams } = new URL(request.url);
@@ -24,10 +24,9 @@ export async function GET(request: Request) {
     const search = searchParams.get("q")?.trim().toLowerCase() ?? "";
 
     if (status && !isTicketStatus(status)) {
-      return NextResponse.json(
-        { error: "Invalid ticket status" },
-        { status: 400, headers: PRIVATE_RESPONSE_HEADERS },
-      );
+      return errorResponse(400, "Invalid ticket status", {
+        headers: PRIVATE_RESPONSE_HEADERS,
+      });
     }
 
     const requestedStatus = status && isTicketStatus(status) ? status : undefined;
@@ -58,10 +57,10 @@ export async function GET(request: Request) {
       { headers: PRIVATE_RESPONSE_HEADERS },
     );
   } catch (error) {
-    console.error("Client ticket list error:", error);
-    return NextResponse.json(
-      { error: "Unable to load tickets" },
-      { status: 500, headers: PRIVATE_RESPONSE_HEADERS },
-    );
+    return handleApiError(error, {
+      context: "Client ticket list error",
+      fallbackMessage: "Unable to load tickets",
+      headers: PRIVATE_RESPONSE_HEADERS,
+    });
   }
 }
