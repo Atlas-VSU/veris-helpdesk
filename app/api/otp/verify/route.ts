@@ -7,7 +7,7 @@ import {
   CLIENT_SESSION_SECONDS,
   signClientToken,
 } from "@/lib/client-token";
-import { WholeWord } from "lucide-react";
+import { errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
 
 const EXPIRED = {
   error: "That code has expired. Please request a new one.",
@@ -22,26 +22,18 @@ const LOCKED = {
 };
 
 export async function POST(request: Request) {
-  let body: unknown;
-
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+    const body = await parseJsonBody(request);
+    const parsed = otpVerifySchema.safeParse(body);
 
-  const parsed = otpVerifySchema.safeParse(body);
+    if (!parsed.success) {
+      return errorResponse(
+        400,
+        parsed.error.issues[0]?.message ?? "Invalid email or code",
+      );
+    }
 
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid email or code" },
-      { status: 400 },
-    );
-  }
-
-  const { email, code } = parsed.data;
-
-  try {
+    const { email, code } = parsed.data;
     const supabase = getSupabaseServerClient();
 
     // 1. Newest code that is not used yet
@@ -58,12 +50,12 @@ export async function POST(request: Request) {
 
     // 2. No code, or the code is too old
     if (!otp || new Date(otp.expires_at).getTime() <= Date.now()) {
-      return NextResponse.json(EXPIRED, { status: 401 });
+      return errorResponse(401, EXPIRED.error, { code: EXPIRED.code });
     }
 
     // 3. Already locked
     if (otp.attempts >= OTP_MAX_ATTEMPTS) {
-      return NextResponse.json(LOCKED, { status: 429 });
+      return errorResponse(429, LOCKED.error, { code: LOCKED.code });
     }
 
     // 4. Count this try BEFORE checking the code. The .eq("attempts", ...)
@@ -80,10 +72,7 @@ export async function POST(request: Request) {
     if (claimError) throw claimError;
 
     if (!claimed) {
-      return NextResponse.json(
-        { error: "Please try again in a moment." },
-        { status: 429 },
-      );
+      return errorResponse(429, "Please try again in a moment.");
     }
 
     // 5. Check the typed code against the scrambled one
@@ -91,9 +80,9 @@ export async function POST(request: Request) {
 
     if (!correct) {
       if (otp.attempts + 1 >= OTP_MAX_ATTEMPTS) {
-        return NextResponse.json(LOCKED, { status: 429 });
+        return errorResponse(429, LOCKED.error, { code: LOCKED.code });
       }
-      return NextResponse.json(WRONG, { status: 401 });
+      return errorResponse(401, WRONG.error, { code: WRONG.code });
     }
 
     // 6. Correct. Make the token first, so a missing JWT_SECRET
@@ -111,7 +100,7 @@ export async function POST(request: Request) {
     if (useError) throw useError;
 
     if (!used) {
-      return NextResponse.json(EXPIRED, { status: 401 });
+      return errorResponse(401, EXPIRED.error, { code: EXPIRED.code });
     }
 
     // 7. Give the client their cookie
@@ -127,10 +116,6 @@ export async function POST(request: Request) {
 
     return response;
   } catch (err) {
-    console.error("OTP verify error:", err);
-    return NextResponse.json(
-      { error: "Something went wrong. Please try again." },
-      { status: 500 },
-    );
+    return handleApiError(err, { context: "OTP verify error" });
   }
 }

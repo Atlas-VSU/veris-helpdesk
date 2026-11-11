@@ -8,30 +8,23 @@ import {
   OTP_RESEND_SECONDS,
 } from "@/lib/otp";
 import { sendOtpEmail } from "@/lib/otp-email";
+import { errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
 
 const SUCCESS_MESSAGE = "If this email has tickets, a code was sent.";
 
 export async function POST(request: Request) {
-  let body: unknown;
-
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+    const body = await parseJsonBody(request);
+    const parsed = otpRequestSchema.safeParse(body);
 
-  const parsed = otpRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return errorResponse(
+        400,
+        parsed.error.issues[0]?.message ?? "Invalid email address",
+      );
+    }
 
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid email address" },
-      { status: 400 },
-    );
-  }
-
-  const email = parsed.data.email;
-
-  try {
+    const email = parsed.data.email;
     const supabase = getSupabaseServerClient();
 
     // 1. Resend wait. Works the same for every email.
@@ -49,13 +42,13 @@ export async function POST(request: Request) {
 
       if (secondsSince < OTP_RESEND_SECONDS) {
         const retryAfterSeconds = Math.ceil(OTP_RESEND_SECONDS - secondsSince);
-        return NextResponse.json(
+        return errorResponse(
+          429,
+          `Please wait ${retryAfterSeconds} seconds before asking for a new code.`,
           {
-            error: `Please wait ${retryAfterSeconds} seconds before asking for a new code.`,
             code: "OTP_RESEND_WAIT",
-            retryAfterSeconds,
+            details: { retryAfterSeconds },
           },
-          { status: 429 },
         );
       }
     }
@@ -102,10 +95,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: SUCCESS_MESSAGE });
   } catch (err) {
-    console.error("OTP request error:", err);
-    return NextResponse.json(
-      { error: "Something went wrong. Please try again." },
-      { status: 500 },
-    );
+    return handleApiError(err, { context: "OTP request error" });
   }
 }

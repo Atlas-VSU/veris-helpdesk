@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { AdminRow } from "@/types/database";
 import { checkAuthRateLimit, loginRateLimit } from "@/lib/rate-limit";
 import { adminLoginSchema } from "@/features/admin/schemas/admin";
+import { errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
+import {
+  ADMIN_COOKIE_NAME,
+  getAdminCookieOptions,
+  signAdminToken,
+} from "@/lib/admin-token";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
@@ -12,39 +17,22 @@ export async function POST(request: Request) {
   try {
     const result = await checkAuthRateLimit(loginRateLimit, ip);
     if (result && !result.success) {
-      return NextResponse.json(
-        { error: "Too many login attempts. Please try again later" },
-        { status: 429 },
-      );
+      return errorResponse(429, "Too many login attempts. Please try again later");
     }
-  } catch {
-    console.error("Login rate limiting is unavailable");
-    return NextResponse.json(
-      { error: "Something went wrong. Please try again." },
-      { status: 500 },
-    );
-  }
-  let body: unknown;
-
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 },
-    );
-  }
-
-  const result = adminLoginSchema.safeParse(body);
-
-  if (!result.success) {
-    return NextResponse.json(
-      { error: result.error.issues[0].message },
-      { status: 400 },
-    );
+  } catch (error) {
+    return handleApiError(error, {
+      context: "Login rate limiting is unavailable",
+    });
   }
 
   try {
+    const body = await parseJsonBody(request);
+    const result = adminLoginSchema.safeParse(body);
+
+    if (!result.success) {
+      return errorResponse(400, result.error.issues[0].message);
+    }
+
     const { email, password } = result.data;
     const supabase = getSupabaseServerClient();
 
@@ -55,50 +43,26 @@ export async function POST(request: Request) {
       .single<AdminRow>();
 
     if (error || !admin) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 },
-      );
+      return errorResponse(401, "Invalid email or password");
     }
 
     const passwordMatches = await bcrypt.compare(password, admin.password_hash);
 
     if (!passwordMatches) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 },
-      );
+      return errorResponse(401, "Invalid email or password");
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
-
-    if (!jwtSecret) {
-      throw new Error("Missing required env var: JWT_SECRET");
-    }
-
-    const token = jwt.sign({ adminId: admin.id, email: admin.email }, jwtSecret, {
-      expiresIn: "24h",
-    });
+    const token = signAdminToken({ adminId: admin.id, email: admin.email });
 
     const response = NextResponse.json({
       message: "Login successful",
       admin: { id: admin.id, email: admin.email, full_name: admin.full_name },
     });
 
-    response.cookies.set("admin_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24,
-      path: "/",
-    });
+    response.cookies.set(ADMIN_COOKIE_NAME, token, getAdminCookieOptions());
 
     return response;
   } catch (err) {
-    console.error("Admin login error:", err);
-    return NextResponse.json(
-      { error: "Something went wrong. Please try again." },
-      { status: 500 },
-    );
+    return handleApiError(err, { context: "Admin login error" });
   }
 }

@@ -209,6 +209,39 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/ServerError"
+  /api/attachments/{attachmentId}:
+    get:
+      summary: Get a temporary signed download URL for an attachment
+      operationId: getAttachmentDownloadUrl
+      description: >
+        Accessible to authenticated administrators (any ticket attachment) or
+        verified clients (only attachments belonging to a ticket matching their
+        session email, compared case-insensitively). Attachments belonging to
+        another client return 404, never 403.
+      security:
+        - adminSession: []
+        - clientSession: []
+      parameters:
+        - $ref: "#/components/parameters/AttachmentId"
+      responses:
+        "200":
+          description: Signed download URL and attachment metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AttachmentDownload"
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/AttachmentNotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
   /api/admin/login:
     post:
       summary: Log in an administrator
@@ -429,6 +462,13 @@ components:
         type: string
         pattern: "^TCK-[0-9]{4}-[0-9]{5}$"
         example: TCK-2026-00001
+    AttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     BadInput:
       description: Bad input.
@@ -448,6 +488,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/TicketNotFoundError"
+    AttachmentNotFound:
+      description: Attachment not found, including when it belongs to a different email.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AttachmentNotFoundError"
     ServerError:
       description: Server error.
       content:
@@ -509,6 +555,14 @@ components:
           type: string
           enum: ["Ticket not found"]
           example: Ticket not found
+    AttachmentNotFoundError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: ["Attachment not found"]
+          example: Attachment not found
     OtpRequest:
       type: object
       required: [email]
@@ -642,6 +696,18 @@ components:
           type: string
         file_size:
           type: integer
+    AttachmentDownload:
+      allOf:
+        - $ref: "#/components/schemas/Attachment"
+        - type: object
+          required: [id, url]
+          properties:
+            id:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
     TicketUpdate:
       type: object
       minProperties: 1
