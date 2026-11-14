@@ -123,7 +123,7 @@ export function TicketForm({
             {errorMessage("captcha") && <p className="mt-2 text-xs text-red-700" id="captcha-error" role="alert">{errorMessage("captcha")}</p>}
           </fieldset>
           <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-end gap-6">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <Button className="text-[var(--palette-gray-olive)] hover:bg-transparent hover:text-[var(--palette-charcoal-olive)]" onClick={onCancel} type="button" variant="ghost">Cancel</Button>
               <Button className="bg-[var(--palette-dark-olive)] px-6 py-3 text-[var(--palette-white)] hover:bg-[var(--palette-moss)]" disabled={isSubmitting} type="submit">
                 {isSubmitting ? "Submitting..." : "Submit Ticket"}
