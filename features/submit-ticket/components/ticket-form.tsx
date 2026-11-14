@@ -74,6 +74,7 @@ export function TicketForm({
         </FieldWithLabel>
         <FieldWithLabel id="description" label={<>Description <span aria-hidden="true" className="text-red-700">*</span></>}>
           <Textarea aria-describedby={errorMessage("description") ? "description-error" : undefined} aria-invalid={Boolean(errorMessage("description"))} className="resize-none" id="description" name="description" onChange={onInputChange} placeholder="Please provide as much detail as possible..." required rows={5} value={formData.description} />
+          <p className="text-xs text-[var(--palette-gray-olive)]">Include what happened, when it started, and any error messages.</p>
           {errorMessage("description") && <p className="text-xs text-red-700" id="description-error">{errorMessage("description")}</p>}
         </FieldWithLabel>
 
