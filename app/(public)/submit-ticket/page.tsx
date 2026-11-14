@@ -40,7 +40,7 @@ export default function SubmitTicketPage() {
   ) : (
     <div className="mx-auto max-w-3xl">
       <div className="mb-10 text-center">
-        <h1 className="font-serif text-4xl font-semibold text-[var(--palette-dark-olive)] md:text-5xl">Submit a Request</h1>
+        <h1 className="font-serif text-4xl font-semibold text-[var(--palette-dark-olive)] md:text-5xl">Submit a Ticket</h1>
         <p className="mt-3 text-lg leading-7 text-[var(--palette-dark-olive)]">We&apos;re here to help. Tell us what you need, and we&apos;ll get back to you shortly.</p>
       </div>
 
