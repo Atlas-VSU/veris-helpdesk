@@ -19,7 +19,7 @@ export function FieldWithLabel({ id, label, children, withSelectIcon = false }: 
 export function FileUploadField({ fileName, error, onChange, onClear, onDrop }: FileUploadFieldProps) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-bold uppercase tracking-[0.04em] text-foreground" htmlFor="attachment">Attachments</label>
+      <label className="text-xs font-bold uppercase tracking-[0.04em] text-foreground" htmlFor="attachment">Attachments <span className="font-normal normal-case text-[var(--palette-gray-olive)]">(optional)</span></label>
       <div
         aria-describedby={error ? "attachment-error" : "attachment-help"}
         className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[var(--palette-stone)] bg-[var(--palette-clay)]/10 p-8 text-center transition hover:bg-[var(--palette-clay)]/20"
