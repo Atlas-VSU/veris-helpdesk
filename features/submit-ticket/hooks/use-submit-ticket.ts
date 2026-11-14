@@ -42,9 +42,8 @@ export function useSubmitTicket() {
     });
   }
 
-  function handleSelectChange(event: ChangeEvent<HTMLSelectElement>) {
-    const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value } as TicketFormData));
+  function handleSelectChange(name: "userType" | "service" | "priority", value: string | null) {
+    setFormData((current) => ({ ...current, [name]: value ?? "" } as TicketFormData));
     setErrors((current) => {
       if (!(name in current)) return current;
       const next = { ...current };

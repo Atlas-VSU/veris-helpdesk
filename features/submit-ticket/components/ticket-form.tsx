@@ -6,8 +6,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect as Select } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   TicketFormProps,
 } from "@/features/submit-ticket/types/types";
@@ -51,18 +57,27 @@ export function TicketForm({
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <FieldWithLabel id="userType" label={<>User Type <span aria-hidden="true" className="text-red-700">*</span></>} withSelectIcon>
-            <Select id="userType" name="userType" onChange={onSelectChange} value={formData.userType}>
-              <option value="subscriber">Subscriber</option>
-              <option value="student">Student</option>
+          <FieldWithLabel id="userType" label={<>User Type <span aria-hidden="true" className="text-red-700">*</span></>}>
+            <Select onValueChange={(value) => onSelectChange("userType", value)} value={formData.userType}>
+              <SelectTrigger className="h-10 w-full border-[var(--palette-gray-olive)] bg-[var(--palette-warm-white)] px-3 text-base text-[var(--palette-charcoal-olive)]" id="userType">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-1 shadow-soft">
+                <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="subscriber">Subscriber</SelectItem>
+                <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="student">Student</SelectItem>
+              </SelectContent>
             </Select>
           </FieldWithLabel>
-          <FieldWithLabel id="service" label={<>Service / Product <span aria-hidden="true" className="text-red-700">*</span></>} withSelectIcon>
-            <Select aria-describedby={errorMessage("service") ? "service-error" : undefined} aria-invalid={Boolean(errorMessage("service"))} id="service" name="service" onChange={onSelectChange} value={formData.service}>
-              <option value="">Select a service...</option>
-              <option>Billing</option>
-              <option>Technical Support</option>
-              <option>General Inquiry</option>
+          <FieldWithLabel id="service" label={<>Service / Product <span aria-hidden="true" className="text-red-700">*</span></>}>
+            <Select onValueChange={(value) => onSelectChange("service", value)} value={formData.service || null}>
+              <SelectTrigger aria-describedby={errorMessage("service") ? "service-error" : undefined} aria-invalid={Boolean(errorMessage("service"))} className="h-10 w-full border-[var(--palette-gray-olive)] bg-[var(--palette-warm-white)] px-3 text-base text-[var(--palette-charcoal-olive)]" id="service">
+                <SelectValue placeholder="Select a service..." />
+              </SelectTrigger>
+              <SelectContent className="border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-1 shadow-soft">
+                <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="Billing">Billing</SelectItem>
+                <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="Technical Support">Technical Support</SelectItem>
+                <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="General Inquiry">General Inquiry</SelectItem>
+              </SelectContent>
             </Select>
             {errorMessage("service") && <p className="mt-1 text-xs text-red-700" id="service-error">{errorMessage("service")}</p>}
           </FieldWithLabel>
@@ -96,13 +111,17 @@ export function TicketForm({
                   </span>
                 </span>
               }
-              withSelectIcon
             >
-              <Select aria-describedby={errorMessage("priority") ? "priority-error" : undefined} aria-invalid={Boolean(errorMessage("priority"))} id="priority" name="priority" onChange={onSelectChange} value={formData.priority}>
-                <option value="low">Low (Minor issue)</option>
-                <option value="medium">Medium (Standard request)</option>
-                <option value="high">High (Significant impact)</option>
-                <option value="urgent">Urgent (System-down)</option>
+              <Select onValueChange={(value) => onSelectChange("priority", value)} value={formData.priority}>
+                <SelectTrigger aria-describedby={errorMessage("priority") ? "priority-error" : undefined} aria-invalid={Boolean(errorMessage("priority"))} className="h-10 w-full border-[var(--palette-gray-olive)] bg-[var(--palette-warm-white)] px-3 text-base text-[var(--palette-charcoal-olive)]" id="priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] p-1 shadow-soft">
+                  <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="low">Low (Minor issue)</SelectItem>
+                  <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="medium">Medium (Standard request)</SelectItem>
+                  <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="high">High (Significant impact)</SelectItem>
+                  <SelectItem className="min-h-10 px-3 text-sm data-highlighted:bg-[var(--palette-clay)]/40" value="urgent">Urgent (System-down)</SelectItem>
+                </SelectContent>
               </Select>
             </FieldWithLabel>
             {errorMessage("priority") && <p className="mt-1 text-xs text-red-700" id="priority-error">{errorMessage("priority")}</p>}

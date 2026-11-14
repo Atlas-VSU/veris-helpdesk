@@ -31,7 +31,7 @@ export type TicketFormProps = {
   fileName: string;
   isSubmitting: boolean;
   onInputChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSelectChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+  onSelectChange: (name: "userType" | "service" | "priority", value: string | null) => void;
   onConsentChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onFileChange: (file: File | null) => void;
   onClearFile: () => void;
