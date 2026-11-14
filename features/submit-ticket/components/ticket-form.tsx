@@ -117,10 +117,11 @@ export function TicketForm({
             <span>I consent to the collection and processing of my data for the purpose of handling this request according to the <Link className="text-[var(--palette-dark-olive)] underline" href="/privacy">Privacy Policy</Link>.</span>
           </label>
           {errorMessage("consent") && <p className="text-xs text-red-700" id="consent-error">{errorMessage("consent")}</p>}
-          <div aria-describedby={errorMessage("captcha") ? "captcha-error" : undefined} aria-invalid={Boolean(errorMessage("captcha"))}>
+          <fieldset aria-describedby={errorMessage("captcha") ? "captcha-error" : undefined} aria-invalid={Boolean(errorMessage("captcha"))}>
+            <legend className="mb-2 text-xs font-bold uppercase tracking-[0.04em] text-foreground">Spam protection <span aria-hidden="true" className="text-red-700">*</span></legend>
             <TurnstileWidget onError={onCaptchaError} onTokenChange={onCaptchaTokenChange} resetKey={captchaResetKey} />
             {errorMessage("captcha") && <p className="mt-2 text-xs text-red-700" id="captcha-error" role="alert">{errorMessage("captcha")}</p>}
-          </div>
+          </fieldset>
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-end gap-6">
               <Button className="text-[var(--palette-gray-olive)] hover:bg-transparent hover:text-[var(--palette-charcoal-olive)]" onClick={onCancel} type="button" variant="ghost">Cancel</Button>
