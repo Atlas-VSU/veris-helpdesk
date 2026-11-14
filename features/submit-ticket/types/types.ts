@@ -19,6 +19,7 @@ export type TicketFormErrors = Partial<Record<
 
 export type FileUploadFieldProps = {
   fileName: string;
+  previewUrl: string | null;
   error?: string;
   onChange: (file: File | null) => void;
   onClear: () => void;
@@ -28,6 +29,7 @@ export type FileUploadFieldProps = {
 export type TicketFormProps = {
   formData: TicketFormData;
   errors: TicketFormErrors;
+  attachmentPreviewUrl: string | null;
   fileName: string;
   isSubmitting: boolean;
   onInputChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;

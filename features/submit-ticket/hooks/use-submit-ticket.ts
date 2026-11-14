@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
 import type { TicketFormData, TicketFormErrors } from "@/features/submit-ticket/types/types";
 import { validateAttachmentMetadata } from "@/features/submit-ticket/attachment-validation";
 
@@ -21,6 +21,7 @@ export function useSubmitTicket() {
   const [formData, setFormData] = useState<TicketFormData>(initialFormData);
   const [errors, setErrors] = useState<TicketFormErrors>({});
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,6 +31,27 @@ export function useSubmitTicket() {
   const [submittedData, setSubmittedData] = useState<TicketFormData | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const submissionPending = useRef(false);
+  const attachmentPreviewUrlRef = useRef<string | null>(null);
+
+  function clearAttachmentPreview() {
+    if (attachmentPreviewUrlRef.current) {
+      URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+      attachmentPreviewUrlRef.current = null;
+    }
+    setAttachmentPreviewUrl(null);
+  }
+
+  function setAttachmentPreview(file: File) {
+    if (attachmentPreviewUrlRef.current) URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+
+    const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+    attachmentPreviewUrlRef.current = previewUrl;
+    setAttachmentPreviewUrl(previewUrl);
+  }
+
+  useEffect(() => () => {
+    if (attachmentPreviewUrlRef.current) URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+  }, []);
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
@@ -65,17 +87,20 @@ export function useSubmitTicket() {
   function handleFileChange(file: File | null) {
     if (!file) {
       setAttachment(null);
+      clearAttachmentPreview();
       return;
     }
 
     const attachmentError = validateAttachmentMetadata(file);
     if (attachmentError) {
       setAttachment(null);
+      clearAttachmentPreview();
       setErrors((current) => ({ ...current, attachment: attachmentError }));
       return;
     }
 
     setAttachment(file);
+    setAttachmentPreview(file);
     setErrors((current) => {
       if (!current.attachment) return current;
       const next = { ...current };
@@ -91,6 +116,7 @@ export function useSubmitTicket() {
 
   function handleClearFile() {
     setAttachment(null);
+    clearAttachmentPreview();
     setErrors((current) => {
       if (!current.attachment) return current;
       const next = { ...current };
@@ -210,6 +236,7 @@ export function useSubmitTicket() {
     formRef.current?.reset();
     setFormData(initialFormData);
     setAttachment(null);
+    clearAttachmentPreview();
     setCaptchaToken("");
     setCaptchaResetKey((current) => current + 1);
     setHasSubmitted(false);
@@ -222,6 +249,7 @@ export function useSubmitTicket() {
   return {
     formData,
     errors,
+    attachmentPreviewUrl,
     fileName: attachment?.name ?? "",
     captchaResetKey,
     isSubmitting,

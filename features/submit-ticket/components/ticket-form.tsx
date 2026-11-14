@@ -23,6 +23,7 @@ import { TurnstileWidget } from "@/features/submit-ticket/components/turnstile-w
 export function TicketForm({
   formData,
   errors,
+  attachmentPreviewUrl,
   fileName,
   isSubmitting,
   onInputChange,
@@ -128,7 +129,7 @@ export function TicketForm({
           </div>
         </div>
 
-        <FileUploadField error={errorMessage("attachment")} fileName={fileName} onChange={onFileChange} onClear={onClearFile} onDrop={onDropFile} />
+        <FileUploadField error={errorMessage("attachment")} fileName={fileName} onChange={onFileChange} onClear={onClearFile} onDrop={onDropFile} previewUrl={attachmentPreviewUrl} />
 
         <div className="space-y-6 border-t border-[var(--palette-stone)] pt-6">
           <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-[var(--palette-dark-olive)]" htmlFor="consent">

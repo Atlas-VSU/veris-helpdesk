@@ -8,6 +8,7 @@ export default function SubmitTicketPage() {
   const {
     formData,
     errors,
+    attachmentPreviewUrl,
     fileName,
     isSubmitting,
     hasSubmitted,
@@ -53,6 +54,7 @@ export default function SubmitTicketPage() {
       <TicketForm
         formData={formData}
         errors={errors}
+        attachmentPreviewUrl={attachmentPreviewUrl}
         fileName={fileName}
         isSubmitting={isSubmitting}
         onCancel={handleMakeAnotherTicket}
