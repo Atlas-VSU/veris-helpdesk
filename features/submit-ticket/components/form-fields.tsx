@@ -27,6 +27,18 @@ export function FileUploadField({ fileName, previewUrl, error, onChange, onClear
         onDragOver={(event) => event.preventDefault()}
         onDrop={onDrop}
       >
+        {previewUrl ? (
+          <>
+            <Image alt={`Preview of ${fileName}`} className="h-48 w-full max-w-md rounded-lg border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] object-contain" height={192} src={previewUrl} unoptimized width={448} />
+            <div className="flex items-center gap-2 text-sm font-medium text-[var(--palette-dark-olive)]">
+              <span className="max-w-56 break-all text-left">{fileName}</span>
+              <button aria-label={`Remove ${fileName}`} className="rounded p-1 hover:bg-[var(--palette-clay)]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)]" onClick={onClear} type="button">
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
         <Upload aria-hidden="true" className="size-8 text-[var(--palette-gray-olive)]" />
         <label className="cursor-pointer text-base text-[var(--palette-dark-olive)]" htmlFor="attachment">
           Drag and drop a file here, or <span className="font-bold underline">browse</span>
@@ -34,9 +46,10 @@ export function FileUploadField({ fileName, previewUrl, error, onChange, onClear
         <span className="text-xs text-[var(--palette-gray-olive)]" id="attachment-help">
           JPG, PNG, or PDF · maximum 10 MB
         </span>
-        {fileName && (
+          </>
+        )}
+        {fileName && !previewUrl && (
           <div className="flex items-center gap-3 text-sm font-medium text-[var(--palette-dark-olive)]">
-            {previewUrl && <Image alt={`Preview of ${fileName}`} className="h-14 w-20 rounded-md border border-[var(--palette-stone)] object-cover" height={56} src={previewUrl} unoptimized width={80} />}
             <span className="max-w-56 break-all text-left">{fileName}</span>
             <button aria-label={`Remove ${fileName}`} className="rounded p-1 hover:bg-[var(--palette-clay)]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)]" onClick={onClear} type="button">
               <X aria-hidden="true" className="size-4" />
