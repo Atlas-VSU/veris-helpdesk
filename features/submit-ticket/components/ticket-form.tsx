@@ -39,25 +39,25 @@ export function TicketForm({
       <div className="space-y-8">
         <div className="grid gap-6 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="fullName">Full Name</Label>
+            <Label htmlFor="fullName">Full Name <span aria-hidden="true" className="text-red-700">*</span></Label>
             <Input aria-describedby={errorMessage("fullName") ? "fullName-error" : undefined} aria-invalid={Boolean(errorMessage("fullName"))} id="fullName" name="fullName" onChange={onInputChange} placeholder="Jane Doe" required value={formData.fullName} />
             {errorMessage("fullName") && <p className="text-xs text-red-700" id="fullName-error">{errorMessage("fullName")}</p>}
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="email">Email Address</Label>
+            <Label htmlFor="email">Email Address <span aria-hidden="true" className="text-red-700">*</span></Label>
             <Input aria-describedby={errorMessage("email") ? "email-error" : undefined} aria-invalid={Boolean(errorMessage("email"))} id="email" name="email" onChange={onInputChange} placeholder="jane@example.com" required type="email" value={formData.email} />
             {errorMessage("email") && <p className="text-xs text-red-700" id="email-error">{errorMessage("email")}</p>}
           </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <FieldWithLabel id="userType" label="User Type" withSelectIcon>
+          <FieldWithLabel id="userType" label={<>User Type <span aria-hidden="true" className="text-red-700">*</span></>} withSelectIcon>
             <Select id="userType" name="userType" onChange={onSelectChange} value={formData.userType}>
               <option value="subscriber">Subscriber</option>
               <option value="student">Student</option>
             </Select>
           </FieldWithLabel>
-          <FieldWithLabel id="service" label="Service / Product" withSelectIcon>
+          <FieldWithLabel id="service" label={<>Service / Product <span aria-hidden="true" className="text-red-700">*</span></>} withSelectIcon>
             <Select aria-describedby={errorMessage("service") ? "service-error" : undefined} aria-invalid={Boolean(errorMessage("service"))} id="service" name="service" onChange={onSelectChange} value={formData.service}>
               <option value="">Select a service...</option>
               <option>Billing</option>
@@ -68,11 +68,11 @@ export function TicketForm({
           </FieldWithLabel>
         </div>
 
-        <FieldWithLabel id="subject" label="Subject">
+        <FieldWithLabel id="subject" label={<>Subject <span aria-hidden="true" className="text-red-700">*</span></>}>
           <Input aria-describedby={errorMessage("subject") ? "subject-error" : undefined} aria-invalid={Boolean(errorMessage("subject"))} id="subject" name="subject" onChange={onInputChange} placeholder="Brief summary of the issue" required value={formData.subject} />
           {errorMessage("subject") && <p className="text-xs text-red-700" id="subject-error">{errorMessage("subject")}</p>}
         </FieldWithLabel>
-        <FieldWithLabel id="description" label="Description">
+        <FieldWithLabel id="description" label={<>Description <span aria-hidden="true" className="text-red-700">*</span></>}>
           <Textarea aria-describedby={errorMessage("description") ? "description-error" : undefined} aria-invalid={Boolean(errorMessage("description"))} className="resize-none" id="description" name="description" onChange={onInputChange} placeholder="Please provide as much detail as possible..." required rows={5} value={formData.description} />
           {errorMessage("description") && <p className="text-xs text-red-700" id="description-error">{errorMessage("description")}</p>}
         </FieldWithLabel>
@@ -83,7 +83,7 @@ export function TicketForm({
               id="priority"
               label={
                 <span className="flex items-center gap-2">
-                  <span>Priority Level</span>
+                  <span>Priority Level <span aria-hidden="true" className="text-red-700">*</span></span>
                   <span className="group relative">
                     <button aria-describedby="priority-help-tooltip" aria-expanded={isPriorityHelpOpen} aria-label="Learn about priority levels" className="flex size-5 items-center justify-center rounded-full border border-[var(--palette-gray-olive)] text-xs font-bold text-[var(--palette-gray-olive)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)]" onClick={() => setIsPriorityHelpOpen((open) => !open)} type="button">?</button>
                     <span className={`absolute bottom-full left-1/2 z-10 mb-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-[var(--palette-dark-olive)] p-3 text-xs leading-5 text-[var(--palette-warm-white)] shadow-lg ${isPriorityHelpOpen ? "block" : "hidden"}`} id="priority-help-tooltip" role="tooltip">
