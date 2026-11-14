@@ -1,7 +1,8 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
 import type { TicketFormData, TicketFormErrors } from "@/features/submit-ticket/types/types";
+import { validateAttachmentMetadata } from "@/features/submit-ticket/attachment-validation";
 
 import { submitTicketAction } from "../actions";
 
@@ -19,7 +20,10 @@ const initialFormData: TicketFormData = {
 export function useSubmitTicket() {
   const [formData, setFormData] = useState<TicketFormData>(initialFormData);
   const [errors, setErrors] = useState<TicketFormErrors>({});
-  const [fileName, setFileName] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +31,27 @@ export function useSubmitTicket() {
   const [submittedData, setSubmittedData] = useState<TicketFormData | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const submissionPending = useRef(false);
+  const attachmentPreviewUrlRef = useRef<string | null>(null);
+
+  function clearAttachmentPreview() {
+    if (attachmentPreviewUrlRef.current) {
+      URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+      attachmentPreviewUrlRef.current = null;
+    }
+    setAttachmentPreviewUrl(null);
+  }
+
+  function setAttachmentPreview(file: File) {
+    if (attachmentPreviewUrlRef.current) URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+
+    const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+    attachmentPreviewUrlRef.current = previewUrl;
+    setAttachmentPreviewUrl(previewUrl);
+  }
+
+  useEffect(() => () => {
+    if (attachmentPreviewUrlRef.current) URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+  }, []);
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
@@ -39,9 +64,8 @@ export function useSubmitTicket() {
     });
   }
 
-  function handleSelectChange(event: ChangeEvent<HTMLSelectElement>) {
-    const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value } as TicketFormData));
+  function handleSelectChange(name: "userType" | "service" | "priority", value: string | null) {
+    setFormData((current) => ({ ...current, [name]: value ?? "" } as TicketFormData));
     setErrors((current) => {
       if (!(name in current)) return current;
       const next = { ...current };
@@ -60,9 +84,61 @@ export function useSubmitTicket() {
     });
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    formRef.current = event.currentTarget.form;
-    setFileName(event.target.files?.[0]?.name ?? "");
+  function handleFileChange(file: File | null) {
+    if (!file) {
+      setAttachment(null);
+      clearAttachmentPreview();
+      return;
+    }
+
+    const attachmentError = validateAttachmentMetadata(file);
+    if (attachmentError) {
+      setAttachment(null);
+      clearAttachmentPreview();
+      setErrors((current) => ({ ...current, attachment: attachmentError }));
+      return;
+    }
+
+    setAttachment(file);
+    setAttachmentPreview(file);
+    setErrors((current) => {
+      if (!current.attachment) return current;
+      const next = { ...current };
+      delete next.attachment;
+      return next;
+    });
+  }
+
+  function handleDropFile(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    handleFileChange(event.dataTransfer.files.item(0));
+  }
+
+  function handleClearFile() {
+    setAttachment(null);
+    clearAttachmentPreview();
+    setErrors((current) => {
+      if (!current.attachment) return current;
+      const next = { ...current };
+      delete next.attachment;
+      return next;
+    });
+  }
+
+  function handleCaptchaTokenChange(token: string) {
+    setCaptchaToken(token);
+    if (!token) return;
+    setErrors((current) => {
+      if (!current.captcha) return current;
+      const next = { ...current };
+      delete next.captcha;
+      return next;
+    });
+  }
+
+  function handleCaptchaError(message: string) {
+    setCaptchaToken("");
+    setErrors((current) => ({ ...current, captcha: message }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -83,6 +159,11 @@ export function useSubmitTicket() {
     if (!formData.description.trim()) nextErrors.description = "Description is required.";
     if (!formData.priority) nextErrors.priority = "Please select a priority.";
     if (!formData.consent) nextErrors.consent = "You must agree to the privacy policy.";
+    if (!captchaToken) nextErrors.captcha = "Please complete the spam protection check.";
+    if (attachment) {
+      const attachmentError = validateAttachmentMetadata(attachment);
+      if (attachmentError) nextErrors.attachment = attachmentError;
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -107,6 +188,9 @@ export function useSubmitTicket() {
         ]),
       ) as TicketFormData;
       const formDataObj = new FormData(event.currentTarget);
+      formDataObj.delete("attachment");
+      if (attachment) formDataObj.set("attachment", attachment);
+      formDataObj.set("cf-turnstile-response", captchaToken);
 
       Object.entries(submissionSnapshot).forEach(([key, value]) => {
         formDataObj.set(
@@ -119,6 +203,8 @@ export function useSubmitTicket() {
       
       if (result.error) {
         setError(result.error);
+        setCaptchaToken("");
+        setCaptchaResetKey((current) => current + 1);
       } else if (
         result.success === true &&
         typeof result.ticketNumber === "string" &&
@@ -134,6 +220,8 @@ export function useSubmitTicket() {
     } catch (err) {
       console.error("Submission error:", err);
       setError("An unexpected error occurred. Please try again.");
+      setCaptchaToken("");
+      setCaptchaResetKey((current) => current + 1);
     } finally {
       submissionPending.current = false;
       setIsSubmitting(false);
@@ -147,7 +235,10 @@ export function useSubmitTicket() {
 
     formRef.current?.reset();
     setFormData(initialFormData);
-    setFileName("");
+    setAttachment(null);
+    clearAttachmentPreview();
+    setCaptchaToken("");
+    setCaptchaResetKey((current) => current + 1);
     setHasSubmitted(false);
     setError(null);
     setErrors({});
@@ -158,7 +249,9 @@ export function useSubmitTicket() {
   return {
     formData,
     errors,
-    fileName,
+    attachmentPreviewUrl,
+    fileName: attachment?.name ?? "",
+    captchaResetKey,
     isSubmitting,
     hasSubmitted,
     error,
@@ -168,6 +261,10 @@ export function useSubmitTicket() {
     handleSelectChange,
     handleConsentChange,
     handleFileChange,
+    handleDropFile,
+    handleClearFile,
+    handleCaptchaError,
+    handleCaptchaTokenChange,
     handleSubmit,
     handleMakeAnotherTicket,
   };

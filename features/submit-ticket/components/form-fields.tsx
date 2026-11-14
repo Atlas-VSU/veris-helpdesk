@@ -1,4 +1,5 @@
-import { ChevronDown, Upload } from "lucide-react";
+import { ChevronDown, Upload, X } from "lucide-react";
+import Image from "next/image";
 import { Label } from "@/components/ui/label";
 import type { FieldWithLabelProps, FileUploadFieldProps } from "@/features/submit-ticket/types/types";
 
@@ -16,16 +17,48 @@ export function FieldWithLabel({ id, label, children, withSelectIcon = false }: 
   );
 }
 
-export function FileUploadField({ fileName, onChange }: FileUploadFieldProps) {
+export function FileUploadField({ fileName, previewUrl, error, onChange, onClear, onDrop }: FileUploadFieldProps) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-bold uppercase tracking-[0.04em] text-foreground" htmlFor="attachment">Attachments</label>
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[var(--palette-stone)] bg-[var(--palette-clay)]/10 p-8 text-center transition hover:bg-[var(--palette-clay)]/20" htmlFor="attachment">
+      <label className="text-xs font-bold uppercase tracking-[0.04em] text-foreground" htmlFor="attachment">Attachments <span className="font-normal normal-case text-[var(--palette-gray-olive)]">(optional)</span></label>
+      <div
+        aria-describedby={error ? "attachment-error" : "attachment-help"}
+        className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[var(--palette-stone)] bg-[var(--palette-clay)]/10 p-8 text-center transition hover:bg-[var(--palette-clay)]/20"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={onDrop}
+      >
+        {previewUrl ? (
+          <>
+            <Image alt={`Preview of ${fileName}`} className="h-48 w-full max-w-md rounded-lg border border-[var(--palette-stone)] bg-[var(--palette-warm-white)] object-contain" height={192} src={previewUrl} unoptimized width={448} />
+            <div className="flex items-center gap-2 text-sm font-medium text-[var(--palette-dark-olive)]">
+              <span className="max-w-56 break-all text-left">{fileName}</span>
+              <button aria-label={`Remove ${fileName}`} className="rounded p-1 hover:bg-[var(--palette-clay)]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)]" onClick={onClear} type="button">
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
         <Upload aria-hidden="true" className="size-8 text-[var(--palette-gray-olive)]" />
-        <span className="text-base text-[var(--palette-dark-olive)]">Drag and drop files here, or <span className="font-bold text-[var(--palette-dark-olive)] underline">browse</span></span>
-        <span className="text-xs text-[var(--palette-gray-olive)]">{fileName || "Max file size: 10MB"}</span>
-      </label>
-      <input className="sr-only" id="attachment" key={fileName || "empty"} name="attachment" onChange={onChange} type="file" />
+        <label className="cursor-pointer text-base text-[var(--palette-dark-olive)]" htmlFor="attachment">
+          Drag and drop a file here, or <span className="font-bold underline">browse</span>
+        </label>
+        <span className="text-xs text-[var(--palette-gray-olive)]" id="attachment-help">
+          JPG, PNG, or PDF · maximum 10 MB
+        </span>
+          </>
+        )}
+        {fileName && !previewUrl && (
+          <div className="flex items-center gap-3 text-sm font-medium text-[var(--palette-dark-olive)]">
+            <span className="max-w-56 break-all text-left">{fileName}</span>
+            <button aria-label={`Remove ${fileName}`} className="rounded p-1 hover:bg-[var(--palette-clay)]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--palette-moss)]" onClick={onClear} type="button">
+              <X aria-hidden="true" className="size-4" />
+            </button>
+          </div>
+        )}
+      </div>
+      <input accept="image/jpeg,image/png,application/pdf" className="sr-only" id="attachment" key={fileName || "empty"} name="attachment" onChange={(event) => onChange(event.target.files?.item(0) ?? null)} type="file" />
+      {error && <p className="text-xs text-red-700" id="attachment-error" role="alert">{error}</p>}
     </div>
   );
 }
