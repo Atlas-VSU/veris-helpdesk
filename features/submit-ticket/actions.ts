@@ -2,6 +2,10 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { createTicketSchema } from "@/features/tickets/schemas/ticket";
+import {
+  hasAcceptedAttachmentSignature,
+  validateAttachmentMetadata,
+} from "@/features/submit-ticket/attachment-validation";
 
 export async function submitTicketAction(formData: FormData) {
   const supabase = getSupabaseServerClient();
@@ -24,18 +28,16 @@ export async function submitTicketAction(formData: FormData) {
   }
   const ticketDataParsed = parsed.data;
 
-  // 2. Validate file (size and type)
+  // 2. Validate file (size, declared type, and file signature)
   const file = formData.get("attachment") as File | null;
   const hasFile = file && file.size > 0;
   
   if (hasFile) {
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    if (file.size > MAX_FILE_SIZE) {
-      return { error: "File size exceeds 10MB limit." };
-    }
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
-    if (!allowedTypes.includes(file.type)) {
-      return { error: "File type not allowed. Please upload an image or PDF." };
+    const validationError = validateAttachmentMetadata(file);
+    if (validationError) return { error: validationError };
+
+    if (!(await hasAcceptedAttachmentSignature(file))) {
+      return { error: "The file contents do not match its declared type." };
     }
   }
 
