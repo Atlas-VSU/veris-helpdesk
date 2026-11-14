@@ -13,7 +13,7 @@ export type TicketFormData = {
 };
 
 export type TicketFormErrors = Partial<Record<
-  "fullName" | "email" | "service" | "subject" | "description" | "priority" | "attachment" | "consent",
+  "fullName" | "email" | "service" | "subject" | "description" | "priority" | "attachment" | "consent" | "captcha",
   string
 >>;
 
@@ -36,6 +36,9 @@ export type TicketFormProps = {
   onFileChange: (file: File | null) => void;
   onClearFile: () => void;
   onDropFile: (event: DragEvent<HTMLDivElement>) => void;
+  captchaResetKey: number;
+  onCaptchaError: (message: string) => void;
+  onCaptchaTokenChange: (token: string) => void;
   onCancel: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };

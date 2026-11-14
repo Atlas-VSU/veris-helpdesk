@@ -21,6 +21,8 @@ export function useSubmitTicket() {
   const [formData, setFormData] = useState<TicketFormData>(initialFormData);
   const [errors, setErrors] = useState<TicketFormErrors>({});
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +100,22 @@ export function useSubmitTicket() {
     });
   }
 
+  function handleCaptchaTokenChange(token: string) {
+    setCaptchaToken(token);
+    if (!token) return;
+    setErrors((current) => {
+      if (!current.captcha) return current;
+      const next = { ...current };
+      delete next.captcha;
+      return next;
+    });
+  }
+
+  function handleCaptchaError(message: string) {
+    setCaptchaToken("");
+    setErrors((current) => ({ ...current, captcha: message }));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submissionPending.current) return;
@@ -116,6 +134,7 @@ export function useSubmitTicket() {
     if (!formData.description.trim()) nextErrors.description = "Description is required.";
     if (!formData.priority) nextErrors.priority = "Please select a priority.";
     if (!formData.consent) nextErrors.consent = "You must agree to the privacy policy.";
+    if (!captchaToken) nextErrors.captcha = "Please complete the spam protection check.";
     if (attachment) {
       const attachmentError = validateAttachmentMetadata(attachment);
       if (attachmentError) nextErrors.attachment = attachmentError;
@@ -146,6 +165,7 @@ export function useSubmitTicket() {
       const formDataObj = new FormData(event.currentTarget);
       formDataObj.delete("attachment");
       if (attachment) formDataObj.set("attachment", attachment);
+      formDataObj.set("cf-turnstile-response", captchaToken);
 
       Object.entries(submissionSnapshot).forEach(([key, value]) => {
         formDataObj.set(
@@ -158,6 +178,8 @@ export function useSubmitTicket() {
       
       if (result.error) {
         setError(result.error);
+        setCaptchaToken("");
+        setCaptchaResetKey((current) => current + 1);
       } else if (
         result.success === true &&
         typeof result.ticketNumber === "string" &&
@@ -173,6 +195,8 @@ export function useSubmitTicket() {
     } catch (err) {
       console.error("Submission error:", err);
       setError("An unexpected error occurred. Please try again.");
+      setCaptchaToken("");
+      setCaptchaResetKey((current) => current + 1);
     } finally {
       submissionPending.current = false;
       setIsSubmitting(false);
@@ -187,6 +211,8 @@ export function useSubmitTicket() {
     formRef.current?.reset();
     setFormData(initialFormData);
     setAttachment(null);
+    setCaptchaToken("");
+    setCaptchaResetKey((current) => current + 1);
     setHasSubmitted(false);
     setError(null);
     setErrors({});
@@ -198,6 +224,7 @@ export function useSubmitTicket() {
     formData,
     errors,
     fileName: attachment?.name ?? "",
+    captchaResetKey,
     isSubmitting,
     hasSubmitted,
     error,
@@ -209,6 +236,8 @@ export function useSubmitTicket() {
     handleFileChange,
     handleDropFile,
     handleClearFile,
+    handleCaptchaError,
+    handleCaptchaTokenChange,
     handleSubmit,
     handleMakeAnotherTicket,
   };

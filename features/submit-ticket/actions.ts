@@ -6,6 +6,7 @@ import {
   hasAcceptedAttachmentSignature,
   validateAttachmentMetadata,
 } from "@/features/submit-ticket/attachment-validation";
+import { verifyTurnstileToken } from "@/features/submit-ticket/turnstile";
 
 export async function submitTicketAction(formData: FormData) {
   const supabase = getSupabaseServerClient();
@@ -28,7 +29,16 @@ export async function submitTicketAction(formData: FormData) {
   }
   const ticketDataParsed = parsed.data;
 
-  // 2. Validate file (size, declared type, and file signature)
+  // 2. Verify the Turnstile token before creating any ticket data.
+  const captchaToken = formData.get("cf-turnstile-response");
+  if (typeof captchaToken !== "string" || !captchaToken.trim()) {
+    return { error: "Please complete the spam protection check.", captchaError: true };
+  }
+  if (!(await verifyTurnstileToken(captchaToken))) {
+    return { error: "We could not verify the spam protection check. Please try again.", captchaError: true };
+  }
+
+  // 3. Validate file (size, declared type, and file signature)
   const file = formData.get("attachment") as File | null;
   const hasFile = file && file.size > 0;
   
@@ -41,7 +51,7 @@ export async function submitTicketAction(formData: FormData) {
     }
   }
 
-  // 3. Insert ticket to database
+  // 4. Insert ticket to database
   const { data: ticketData, error: ticketError } = await supabase
     .from("tickets")
     .insert({
@@ -67,7 +77,7 @@ export async function submitTicketAction(formData: FormData) {
   const ticketId = ticketData.id;
   const ticketNumber = ticketData.ticket_number;
 
-  // 4. Upload file to storage
+  // 5. Upload file to storage
   if (hasFile) {
     const timestamp = Date.now();
     const storagePath = `${ticketId}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
@@ -88,7 +98,7 @@ export async function submitTicketAction(formData: FormData) {
       return { error: "Failed to upload attachment. Please try again." };
     }
 
-    // 5. Insert attachment record
+    // 6. Insert attachment record
     const { error: attachmentError } = await supabase
       .from("attachments")
       .insert({

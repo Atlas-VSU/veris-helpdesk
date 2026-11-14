@@ -20,6 +20,9 @@ export default function SubmitTicketPage() {
     handleFileChange,
     handleDropFile,
     handleClearFile,
+    captchaResetKey,
+    handleCaptchaError,
+    handleCaptchaTokenChange,
     handleSubmit,
     handleMakeAnotherTicket,
   } = useSubmitTicket();
@@ -57,6 +60,9 @@ export default function SubmitTicketPage() {
         onFileChange={handleFileChange}
         onClearFile={handleClearFile}
         onDropFile={handleDropFile}
+        captchaResetKey={captchaResetKey}
+        onCaptchaError={handleCaptchaError}
+        onCaptchaTokenChange={handleCaptchaTokenChange}
         onInputChange={handleInputChange}
         onSelectChange={handleSelectChange}
         onSubmit={handleSubmit}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Send, ShieldCheck } from "lucide-react";
+import { Send } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import type {
   TicketFormProps,
 } from "@/features/submit-ticket/types/types";
 import { FieldWithLabel, FileUploadField } from "@/features/submit-ticket/components/form-fields";
+import { TurnstileWidget } from "@/features/submit-ticket/components/turnstile-widget";
 
 export function TicketForm({
   formData,
@@ -24,6 +25,9 @@ export function TicketForm({
   onFileChange,
   onClearFile,
   onDropFile,
+  captchaResetKey,
+  onCaptchaError,
+  onCaptchaTokenChange,
   onCancel,
   onSubmit,
 }: TicketFormProps) {
@@ -112,9 +116,9 @@ export function TicketForm({
             <span>I consent to the collection and processing of my data for the purpose of handling this request according to the <Link className="text-[var(--palette-dark-olive)] underline" href="/privacy">Privacy Policy</Link>.</span>
           </label>
           {errorMessage("consent") && <p className="text-xs text-red-700" id="consent-error">{errorMessage("consent")}</p>}
-          <div className="flex w-fit items-center gap-2 rounded-lg border border-[var(--palette-stone)] bg-[var(--palette-off-white)] px-3 py-2 text-sm italic text-[var(--palette-gray-olive)]">
-            <ShieldCheck aria-hidden="true" className="size-4" />
-            <span>[ CAPTCHA Placeholder ]</span>
+          <div aria-describedby={errorMessage("captcha") ? "captcha-error" : undefined} aria-invalid={Boolean(errorMessage("captcha"))}>
+            <TurnstileWidget onError={onCaptchaError} onTokenChange={onCaptchaTokenChange} resetKey={captchaResetKey} />
+            {errorMessage("captcha") && <p className="mt-2 text-xs text-red-700" id="captcha-error" role="alert">{errorMessage("captcha")}</p>}
           </div>
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-end gap-6">
