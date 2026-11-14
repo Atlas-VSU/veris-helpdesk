@@ -18,6 +18,8 @@ export default function SubmitTicketPage() {
     handleSelectChange,
     handleConsentChange,
     handleFileChange,
+    handleDropFile,
+    handleClearFile,
     handleSubmit,
     handleMakeAnotherTicket,
   } = useSubmitTicket();
@@ -53,6 +55,8 @@ export default function SubmitTicketPage() {
         onCancel={handleMakeAnotherTicket}
         onConsentChange={handleConsentChange}
         onFileChange={handleFileChange}
+        onClearFile={handleClearFile}
+        onDropFile={handleDropFile}
         onInputChange={handleInputChange}
         onSelectChange={handleSelectChange}
         onSubmit={handleSubmit}

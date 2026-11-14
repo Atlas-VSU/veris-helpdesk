@@ -22,6 +22,8 @@ export function TicketForm({
   onSelectChange,
   onConsentChange,
   onFileChange,
+  onClearFile,
+  onDropFile,
   onCancel,
   onSubmit,
 }: TicketFormProps) {
@@ -102,7 +104,7 @@ export function TicketForm({
           </div>
         </div>
 
-        <FileUploadField fileName={fileName} onChange={onFileChange} />
+        <FileUploadField error={errorMessage("attachment")} fileName={fileName} onChange={onFileChange} onClear={onClearFile} onDrop={onDropFile} />
 
         <div className="space-y-6 border-t border-[var(--palette-stone)] pt-6">
           <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-[var(--palette-dark-olive)]" htmlFor="consent">

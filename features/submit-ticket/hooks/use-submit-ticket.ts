@@ -1,7 +1,8 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from "react";
 import type { TicketFormData, TicketFormErrors } from "@/features/submit-ticket/types/types";
+import { validateAttachmentMetadata } from "@/features/submit-ticket/attachment-validation";
 
 import { submitTicketAction } from "../actions";
 
@@ -19,7 +20,7 @@ const initialFormData: TicketFormData = {
 export function useSubmitTicket() {
   const [formData, setFormData] = useState<TicketFormData>(initialFormData);
   const [errors, setErrors] = useState<TicketFormErrors>({});
-  const [fileName, setFileName] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,9 +61,41 @@ export function useSubmitTicket() {
     });
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    formRef.current = event.currentTarget.form;
-    setFileName(event.target.files?.[0]?.name ?? "");
+  function handleFileChange(file: File | null) {
+    if (!file) {
+      setAttachment(null);
+      return;
+    }
+
+    const attachmentError = validateAttachmentMetadata(file);
+    if (attachmentError) {
+      setAttachment(null);
+      setErrors((current) => ({ ...current, attachment: attachmentError }));
+      return;
+    }
+
+    setAttachment(file);
+    setErrors((current) => {
+      if (!current.attachment) return current;
+      const next = { ...current };
+      delete next.attachment;
+      return next;
+    });
+  }
+
+  function handleDropFile(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    handleFileChange(event.dataTransfer.files.item(0));
+  }
+
+  function handleClearFile() {
+    setAttachment(null);
+    setErrors((current) => {
+      if (!current.attachment) return current;
+      const next = { ...current };
+      delete next.attachment;
+      return next;
+    });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -83,6 +116,10 @@ export function useSubmitTicket() {
     if (!formData.description.trim()) nextErrors.description = "Description is required.";
     if (!formData.priority) nextErrors.priority = "Please select a priority.";
     if (!formData.consent) nextErrors.consent = "You must agree to the privacy policy.";
+    if (attachment) {
+      const attachmentError = validateAttachmentMetadata(attachment);
+      if (attachmentError) nextErrors.attachment = attachmentError;
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -107,6 +144,8 @@ export function useSubmitTicket() {
         ]),
       ) as TicketFormData;
       const formDataObj = new FormData(event.currentTarget);
+      formDataObj.delete("attachment");
+      if (attachment) formDataObj.set("attachment", attachment);
 
       Object.entries(submissionSnapshot).forEach(([key, value]) => {
         formDataObj.set(
@@ -147,7 +186,7 @@ export function useSubmitTicket() {
 
     formRef.current?.reset();
     setFormData(initialFormData);
-    setFileName("");
+    setAttachment(null);
     setHasSubmitted(false);
     setError(null);
     setErrors({});
@@ -158,7 +197,7 @@ export function useSubmitTicket() {
   return {
     formData,
     errors,
-    fileName,
+    fileName: attachment?.name ?? "",
     isSubmitting,
     hasSubmitted,
     error,
@@ -168,6 +207,8 @@ export function useSubmitTicket() {
     handleSelectChange,
     handleConsentChange,
     handleFileChange,
+    handleDropFile,
+    handleClearFile,
     handleSubmit,
     handleMakeAnotherTicket,
   };
