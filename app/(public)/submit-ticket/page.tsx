@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertCircle } from "lucide-react";
 import { useSubmitTicket } from "@/features/submit-ticket/hooks/use-submit-ticket";
 import { TicketForm } from "@/features/submit-ticket/components/ticket-form";
 import { TicketSuccessState } from "@/features/submit-ticket/components/ticket-success-state";
@@ -10,6 +11,11 @@ export default function SubmitTicketPage() {
     errors,
     attachmentPreviewUrl,
     fileName,
+    fileSize,
+    fileInputKey,
+    hasDraftContent,
+    isAttachmentRejected,
+    isValidatingAttachment,
     isSubmitting,
     hasSubmitted,
     ticketNumber,
@@ -40,14 +46,18 @@ export default function SubmitTicketPage() {
     />
   ) : (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-10 text-center">
-        <h1 className="font-serif text-4xl font-semibold text-[var(--palette-dark-olive)] md:text-5xl">Submit a Ticket</h1>
-        <p className="mt-3 text-lg leading-7 text-[var(--palette-dark-olive)]">We&apos;re here to help. Tell us what you need, and we&apos;ll get back to you shortly.</p>
+      <div className="mb-8 text-center">
+        <h1 className="font-serif text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Submit a Ticket</h1>
+        <p className="mt-3 text-base leading-7 text-muted-foreground md:text-lg">We&apos;re here to help. Tell us what you need, and we&apos;ll get back to you shortly.</p>
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-800 border border-red-200">
-          {error}
+        <div
+          className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium text-destructive"
+          role="alert"
+        >
+          <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -56,6 +66,11 @@ export default function SubmitTicketPage() {
         errors={errors}
         attachmentPreviewUrl={attachmentPreviewUrl}
         fileName={fileName}
+        fileSize={fileSize}
+        fileInputKey={fileInputKey}
+        hasDraftContent={hasDraftContent}
+        isAttachmentRejected={isAttachmentRejected}
+        isValidatingAttachment={isValidatingAttachment}
         isSubmitting={isSubmitting}
         onCancel={handleMakeAnotherTicket}
         onConsentChange={handleConsentChange}
@@ -73,8 +88,8 @@ export default function SubmitTicketPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--palette-cream)] text-[var(--palette-charcoal-olive)]">
-      <main className="mx-auto max-w-[1440px] px-4 py-10 sm:px-6 md:px-12 md:py-16">
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 md:px-12 md:py-12">
         {content}
       </main>
     </div>
