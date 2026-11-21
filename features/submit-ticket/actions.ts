@@ -1,14 +1,34 @@
 "use server";
 
+import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { ticketSubmissionRateLimit } from "@/lib/rate-limit";
 import { createTicketSchema } from "@/features/tickets/schemas/ticket";
 import {
   hasAcceptedAttachmentSignature,
   validateAttachmentMetadata,
 } from "@/features/submit-ticket/attachment-validation";
 import { verifyTurnstileToken } from "@/features/submit-ticket/turnstile";
+import type { SubmitTicketActionResult } from "@/features/submit-ticket/types/types";
 
-export async function submitTicketAction(formData: FormData) {
+export async function submitTicketAction(formData: FormData): Promise<SubmitTicketActionResult> {
+  // 0. Rate limit ticket submissions by client IP
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for");
+  const ip = forwardedFor?.split(",")[0]?.trim() || "127.0.0.1";
+
+  if (ticketSubmissionRateLimit) {
+    try {
+      const { success } = await ticketSubmissionRateLimit.limit(ip);
+      if (!success) {
+        return { error: "Too many ticket submissions. Please try again later." };
+      }
+    } catch (error) {
+      console.error("Rate limiting error:", error);
+      // If Redis fails, allow the request to pass through to not break functionality
+    }
+  }
+
   const supabase = getSupabaseServerClient();
 
   const rawData = {
@@ -39,10 +59,11 @@ export async function submitTicketAction(formData: FormData) {
   }
 
   // 3. Validate file (size, declared type, and file signature)
-  const file = formData.get("attachment") as File | null;
-  const hasFile = file && file.size > 0;
-  
-  if (hasFile) {
+  const attachmentEntry = formData.get("attachment");
+  const file = attachmentEntry instanceof File ? attachmentEntry : null;
+  const hasFile = Boolean(file && (file.size > 0 || file.name.length > 0));
+
+  if (hasFile && file) {
     const validationError = validateAttachmentMetadata(file);
     if (validationError) return { error: validationError };
 
@@ -78,7 +99,7 @@ export async function submitTicketAction(formData: FormData) {
   const ticketNumber = ticketData.ticket_number;
 
   // 5. Upload file to storage
-  if (hasFile) {
+  if (hasFile && file) {
     const timestamp = Date.now();
     const storagePath = `${ticketId}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
 

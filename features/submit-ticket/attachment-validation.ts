@@ -9,6 +9,10 @@ export const ACCEPTED_ATTACHMENT_TYPES = [
 export const ACCEPTED_ATTACHMENT_INPUT_TYPES = ACCEPTED_ATTACHMENT_TYPES.join(",");
 
 export function validateAttachmentMetadata(file: File) {
+  if (file.size === 0) {
+    return "The selected file is empty. Please choose a valid JPG, PNG, or PDF file.";
+  }
+
   if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
     return "File size exceeds the 10 MB limit.";
   }

@@ -17,8 +17,67 @@ export type TicketFormErrors = Partial<Record<
   string
 >>;
 
+export type TurnstileApi = {
+  render: (container: HTMLElement, options: Record<string, unknown>) => string;
+  reset: (widgetId: string) => void;
+  remove: (widgetId: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi;
+  }
+}
+
+export type TurnstileWidgetProps = {
+  onError: (message: string) => void;
+  onTokenChange: (token: string) => void;
+  resetKey: number;
+};
+
+export type TurnstileVerificationResult = {
+  success: boolean;
+  action?: string;
+};
+
+export type RejectedAttachment = {
+  name: string;
+  error: string;
+};
+
+export type SubmitTicketActionResult =
+  | {
+      success: true;
+      ticketNumber: string;
+      error?: undefined;
+      captchaError?: undefined;
+    }
+  | {
+      success?: false;
+      error: string;
+      captchaError?: boolean;
+      ticketNumber?: undefined;
+    };
+
+export type UserTypeOption = {
+  value: UserType;
+  label: string;
+};
+
+export type PriorityOption = {
+  value: TicketPriority;
+  label: string;
+  description: string;
+  dotClassName: string;
+  selectedClassName: string;
+};
+
 export type FileUploadFieldProps = {
   fileName: string;
+  fileSize: number | null;
+  fileInputKey: number;
+  isRejected: boolean;
+  isValidating?: boolean;
   previewUrl: string | null;
   error?: string;
   onChange: (file: File | null) => void;
@@ -31,6 +90,11 @@ export type TicketFormProps = {
   errors: TicketFormErrors;
   attachmentPreviewUrl: string | null;
   fileName: string;
+  fileSize: number | null;
+  fileInputKey: number;
+  hasDraftContent: boolean;
+  isAttachmentRejected: boolean;
+  isValidatingAttachment: boolean;
   isSubmitting: boolean;
   onInputChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onSelectChange: (name: "userType" | "service" | "priority", value: string | null) => void;
