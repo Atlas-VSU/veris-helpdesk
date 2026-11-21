@@ -1,26 +1,36 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
-import type { TicketFormData, TicketFormErrors } from "@/features/submit-ticket/types/types";
-import { validateAttachmentMetadata } from "@/features/submit-ticket/attachment-validation";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type {
+  RejectedAttachment,
+  TicketFormData,
+  TicketFormErrors,
+} from "@/features/submit-ticket/types/types";
+import {
+  hasAcceptedAttachmentSignature,
+  validateAttachmentMetadata,
+} from "@/features/submit-ticket/attachment-validation";
+import {
+  clearTicketFormDraft,
+  getTicketFormDraftServerSnapshot,
+  getTicketFormDraftSnapshot,
+  subscribeToTicketFormDraft,
+  writeTicketFormDraft,
+} from "@/features/submit-ticket/draft-storage";
 
 import { submitTicketAction } from "../actions";
 
-const initialFormData: TicketFormData = {
-  fullName: "",
-  email: "",
-  userType: "subscriber",
-  service: "",
-  subject: "",
-  description: "",
-  priority: "low",
-  consent: false,
-};
-
 export function useSubmitTicket() {
-  const [formData, setFormData] = useState<TicketFormData>(initialFormData);
+  const formData = useSyncExternalStore(
+    subscribeToTicketFormDraft,
+    getTicketFormDraftSnapshot,
+    getTicketFormDraftServerSnapshot,
+  );
   const [errors, setErrors] = useState<TicketFormErrors>({});
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [rejectedAttachment, setRejectedAttachment] = useState<RejectedAttachment | null>(null);
+  const [isValidatingAttachment, setIsValidatingAttachment] = useState(false);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
@@ -32,6 +42,7 @@ export function useSubmitTicket() {
   const formRef = useRef<HTMLFormElement | null>(null);
   const submissionPending = useRef(false);
   const attachmentPreviewUrlRef = useRef<string | null>(null);
+  const fileValidationIdRef = useRef(0);
 
   function clearAttachmentPreview() {
     if (attachmentPreviewUrlRef.current) {
@@ -53,9 +64,14 @@ export function useSubmitTicket() {
     if (attachmentPreviewUrlRef.current) URL.revokeObjectURL(attachmentPreviewUrlRef.current);
   }, []);
 
+  function updateFormData(updater: (current: TicketFormData) => TicketFormData) {
+    const next = updater(getTicketFormDraftSnapshot());
+    writeTicketFormDraft(next);
+  }
+
   function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value }));
+    updateFormData((current) => ({ ...current, [name]: value }));
     setErrors((current) => {
       if (!(name in current)) return current;
       const next = { ...current };
@@ -65,7 +81,7 @@ export function useSubmitTicket() {
   }
 
   function handleSelectChange(name: "userType" | "service" | "priority", value: string | null) {
-    setFormData((current) => ({ ...current, [name]: value ?? "" } as TicketFormData));
+    updateFormData((current) => ({ ...current, [name]: value ?? "" } as TicketFormData));
     setErrors((current) => {
       if (!(name in current)) return current;
       const next = { ...current };
@@ -75,7 +91,8 @@ export function useSubmitTicket() {
   }
 
   function handleConsentChange(event: ChangeEvent<HTMLInputElement>) {
-    setFormData((current) => ({ ...current, consent: event.target.checked }));
+    const { checked } = event.target;
+    updateFormData((current) => ({ ...current, consent: checked }));
     setErrors((current) => {
       if (!current.consent) return current;
       const next = { ...current };
@@ -84,21 +101,54 @@ export function useSubmitTicket() {
     });
   }
 
-  function handleFileChange(file: File | null) {
+  async function handleFileChange(file: File | null) {
+    const validationId = ++fileValidationIdRef.current;
+
     if (!file) {
+      setIsValidatingAttachment(false);
       setAttachment(null);
+      setRejectedAttachment(null);
       clearAttachmentPreview();
+      setErrors((current) => {
+        if (!current.attachment) return current;
+        const next = { ...current };
+        delete next.attachment;
+        return next;
+      });
       return;
     }
 
     const attachmentError = validateAttachmentMetadata(file);
     if (attachmentError) {
+      setIsValidatingAttachment(false);
       setAttachment(null);
+      setRejectedAttachment({ name: file.name, error: attachmentError });
       clearAttachmentPreview();
       setErrors((current) => ({ ...current, attachment: attachmentError }));
       return;
     }
 
+    setIsValidatingAttachment(true);
+    let hasValidSignature = false;
+    try {
+      hasValidSignature = await hasAcceptedAttachmentSignature(file);
+    } catch {
+      hasValidSignature = false;
+    }
+
+    if (validationId !== fileValidationIdRef.current) return;
+    setIsValidatingAttachment(false);
+
+    if (!hasValidSignature) {
+      const signatureError = "The file contents do not match its declared type.";
+      setAttachment(null);
+      setRejectedAttachment({ name: file.name, error: signatureError });
+      clearAttachmentPreview();
+      setErrors((current) => ({ ...current, attachment: signatureError }));
+      return;
+    }
+
+    setRejectedAttachment(null);
     setAttachment(file);
     setAttachmentPreview(file);
     setErrors((current) => {
@@ -111,12 +161,16 @@ export function useSubmitTicket() {
 
   function handleDropFile(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
-    handleFileChange(event.dataTransfer.files.item(0));
+    void handleFileChange(event.dataTransfer.files.item(0));
   }
 
   function handleClearFile() {
+    fileValidationIdRef.current += 1;
+    setIsValidatingAttachment(false);
     setAttachment(null);
+    setRejectedAttachment(null);
     clearAttachmentPreview();
+    setFileInputKey((current) => current + 1);
     setErrors((current) => {
       if (!current.attachment) return current;
       const next = { ...current };
@@ -143,7 +197,7 @@ export function useSubmitTicket() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submissionPending.current) return;
+    if (submissionPending.current || isValidatingAttachment) return;
 
     const nextErrors: TicketFormErrors = {};
     const trimmedEmail = formData.email.trim();
@@ -155,18 +209,41 @@ export function useSubmitTicket() {
       nextErrors.email = "Enter a valid email address.";
     }
     if (!formData.service) nextErrors.service = "Please select a service.";
-    if (!formData.subject.trim()) nextErrors.subject = "Subject is required.";
+    if (!formData.subject.trim()) {
+      nextErrors.subject = "Subject is required.";
+    } else if (formData.subject.trim().length > 200) {
+      nextErrors.subject = "Subject must be 200 characters or fewer.";
+    }
     if (!formData.description.trim()) nextErrors.description = "Description is required.";
     if (!formData.priority) nextErrors.priority = "Please select a priority.";
     if (!formData.consent) nextErrors.consent = "You must agree to the privacy policy.";
     if (!captchaToken) nextErrors.captcha = "Please complete the spam protection check.";
-    if (attachment) {
+    if (rejectedAttachment) {
+      nextErrors.attachment = rejectedAttachment.error;
+    } else if (attachment) {
       const attachmentError = validateAttachmentMetadata(attachment);
       if (attachmentError) nextErrors.attachment = attachmentError;
     }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
+      const fieldOrder: Array<{ key: keyof TicketFormErrors; id: string }> = [
+        { key: "fullName", id: "fullName" },
+        { key: "email", id: "email" },
+        { key: "service", id: "service" },
+        { key: "subject", id: "subject" },
+        { key: "description", id: "description" },
+        { key: "priority", id: "priority-low" },
+        { key: "attachment", id: "attachment-dropzone" },
+        { key: "consent", id: "consent" },
+        { key: "captcha", id: "captcha-section" },
+      ];
+      const firstInvalid = fieldOrder.find(({ key }) => Boolean(nextErrors[key]));
+      if (firstInvalid && typeof document !== "undefined") {
+        const target = document.getElementById(firstInvalid.id);
+        target?.focus({ preventScroll: false });
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
 
@@ -211,6 +288,7 @@ export function useSubmitTicket() {
         result.ticketNumber.trim().length > 0
       ) {
         const normalizedTicketNumber = result.ticketNumber.trim();
+        clearTicketFormDraft();
         setTicketNumber(normalizedTicketNumber);
         setSubmittedData(submissionSnapshot);
         setHasSubmitted(true);
@@ -233,10 +311,14 @@ export function useSubmitTicket() {
     // Avoid clearing the form while its submission is still being processed.
     if (submissionPending.current) return;
 
+    fileValidationIdRef.current += 1;
+    clearTicketFormDraft();
     formRef.current?.reset();
-    setFormData(initialFormData);
+    setIsValidatingAttachment(false);
     setAttachment(null);
+    setRejectedAttachment(null);
     clearAttachmentPreview();
+    setFileInputKey((current) => current + 1);
     setCaptchaToken("");
     setCaptchaResetKey((current) => current + 1);
     setHasSubmitted(false);
@@ -246,11 +328,29 @@ export function useSubmitTicket() {
     setSubmittedData(null);
   }
 
+  const hasDraftContent = Boolean(
+    formData.fullName.trim() ||
+    formData.email.trim() ||
+    formData.userType !== "subscriber" ||
+    formData.service ||
+    formData.subject.trim() ||
+    formData.description.trim() ||
+    formData.priority !== "low" ||
+    formData.consent ||
+    attachment ||
+    rejectedAttachment,
+  );
+
   return {
     formData,
     errors,
     attachmentPreviewUrl,
-    fileName: attachment?.name ?? "",
+    fileName: attachment?.name ?? rejectedAttachment?.name ?? "",
+    fileSize: attachment?.size ?? null,
+    fileInputKey,
+    hasDraftContent,
+    isAttachmentRejected: Boolean(rejectedAttachment),
+    isValidatingAttachment,
     captchaResetKey,
     isSubmitting,
     hasSubmitted,
