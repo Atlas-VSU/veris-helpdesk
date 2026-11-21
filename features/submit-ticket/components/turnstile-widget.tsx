@@ -3,24 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import Script from "next/script";
 import { TURNSTILE_ACTION } from "@/features/submit-ticket/turnstile-constants";
-
-type TurnstileApi = {
-  render: (container: HTMLElement, options: Record<string, unknown>) => string;
-  reset: (widgetId: string) => void;
-  remove: (widgetId: string) => void;
-};
-
-declare global {
-  interface Window {
-    turnstile?: TurnstileApi;
-  }
-}
-
-type TurnstileWidgetProps = {
-  onError: (message: string) => void;
-  onTokenChange: (token: string) => void;
-  resetKey: number;
-};
+import type { TurnstileWidgetProps } from "@/features/submit-ticket/types/types";
 
 export function TurnstileWidget({ onError, onTokenChange, resetKey }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -45,17 +28,25 @@ export function TurnstileWidget({ onError, onTokenChange, resetKey }: TurnstileW
         callbacksRef.current.onTokenChange("");
         callbacksRef.current.onError("Spam protection expired. Please complete it again.");
       },
+      "timeout-callback": () => {
+        callbacksRef.current.onTokenChange("");
+        callbacksRef.current.onError("Spam protection timed out. Please complete it again.");
+      },
     });
   }, [siteKey]);
 
-  useEffect(() => () => {
-    if (widgetIdRef.current && window.turnstile) {
-      window.turnstile.remove(widgetIdRef.current);
-      widgetIdRef.current = null;
-    }
-  }, []);
+  useEffect(() => {
+    renderWidget();
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+    };
+  }, [renderWidget]);
 
   useEffect(() => {
+    if (resetKey === 0) return;
     if (widgetIdRef.current && window.turnstile) {
       window.turnstile.reset(widgetIdRef.current);
       callbacksRef.current.onTokenChange("");
@@ -63,7 +54,7 @@ export function TurnstileWidget({ onError, onTokenChange, resetKey }: TurnstileW
   }, [resetKey]);
 
   if (!siteKey) {
-    return <p className="text-sm text-red-700" role="alert">Spam protection is unavailable. Please try again later.</p>;
+    return <p className="text-sm font-medium text-destructive" role="alert">Spam protection is unavailable. Please try again later.</p>;
   }
 
   return (

@@ -1,8 +1,7 @@
 import { TURNSTILE_ACTION } from "@/features/submit-ticket/turnstile-constants";
+import type { TurnstileVerificationResult } from "@/features/submit-ticket/types/types";
 
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-
-type TurnstileVerificationResult = { success: boolean; action?: string };
 
 export async function verifyTurnstileToken(token: string) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
