@@ -263,4 +263,11 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
       assert.equal((await api.proxy(request("/api/tickets"))).headers.get("x-middleware-next"), "1");
     }
   });
+
+  await t.test("proxy does not duplicate rate limiting for /submit-ticket Server Actions", async () => {
+    const api = setup({ response: { ...healthy, success: false, remaining: 0 } });
+    const response = await api.proxy(request("/submit-ticket", "POST"));
+    assert.equal(response.headers.get("x-middleware-next"), "1");
+    assert.equal(api.calls.length, 0);
+  });
 });
