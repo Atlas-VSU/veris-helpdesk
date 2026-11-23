@@ -226,6 +226,8 @@ supabase db push
    UPSTASH_REDIS_REST_TOKEN=
    GMAIL_USER=                    # sender account for OTP emails
    GMAIL_APP_PASSWORD=            # a Google "app password", not the account password
+   NEXT_PUBLIC_TURNSTILE_SITE_KEY= # Cloudflare Turnstile site key, safe for the browser
+   TURNSTILE_SECRET_KEY=           # Cloudflare Turnstile secret key, server only
 ```
 
    > Env vars change frequently as new features are added (Gmail app password, JWT secret, etc.) — always check the group for the latest values rather than relying on old ones you may have saved locally.

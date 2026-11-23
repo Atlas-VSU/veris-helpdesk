@@ -1,9 +1,34 @@
 "use server";
 
+import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { ticketSubmissionRateLimit } from "@/lib/rate-limit";
 import { createTicketSchema } from "@/features/tickets/schemas/ticket";
+import {
+  hasAcceptedAttachmentSignature,
+  validateAttachmentMetadata,
+} from "@/features/submit-ticket/attachment-validation";
+import { verifyTurnstileToken } from "@/features/submit-ticket/turnstile";
+import type { SubmitTicketActionResult } from "@/features/submit-ticket/types/types";
 
-export async function submitTicketAction(formData: FormData) {
+export async function submitTicketAction(formData: FormData): Promise<SubmitTicketActionResult> {
+  // 0. Rate limit ticket submissions by client IP
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for");
+  const ip = forwardedFor?.split(",")[0]?.trim() || "127.0.0.1";
+
+  if (ticketSubmissionRateLimit) {
+    try {
+      const { success } = await ticketSubmissionRateLimit.limit(ip);
+      if (!success) {
+        return { error: "Too many ticket submissions. Please try again later." };
+      }
+    } catch (error) {
+      console.error("Rate limiting error:", error);
+      // If Redis fails, allow the request to pass through to not break functionality
+    }
+  }
+
   const supabase = getSupabaseServerClient();
 
   const rawData = {
@@ -24,22 +49,30 @@ export async function submitTicketAction(formData: FormData) {
   }
   const ticketDataParsed = parsed.data;
 
-  // 2. Validate file (size and type)
-  const file = formData.get("attachment") as File | null;
-  const hasFile = file && file.size > 0;
-  
-  if (hasFile) {
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    if (file.size > MAX_FILE_SIZE) {
-      return { error: "File size exceeds 10MB limit." };
-    }
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
-    if (!allowedTypes.includes(file.type)) {
-      return { error: "File type not allowed. Please upload an image or PDF." };
+  // 2. Verify the Turnstile token before creating any ticket data.
+  const captchaToken = formData.get("cf-turnstile-response");
+  if (typeof captchaToken !== "string" || !captchaToken.trim()) {
+    return { error: "Please complete the spam protection check.", captchaError: true };
+  }
+  if (!(await verifyTurnstileToken(captchaToken))) {
+    return { error: "We could not verify the spam protection check. Please try again.", captchaError: true };
+  }
+
+  // 3. Validate file (size, declared type, and file signature)
+  const attachmentEntry = formData.get("attachment");
+  const file = attachmentEntry instanceof File ? attachmentEntry : null;
+  const hasFile = Boolean(file && (file.size > 0 || file.name.length > 0));
+
+  if (hasFile && file) {
+    const validationError = validateAttachmentMetadata(file);
+    if (validationError) return { error: validationError };
+
+    if (!(await hasAcceptedAttachmentSignature(file))) {
+      return { error: "The file contents do not match its declared type." };
     }
   }
 
-  // 3. Insert ticket to database
+  // 4. Insert ticket to database
   const { data: ticketData, error: ticketError } = await supabase
     .from("tickets")
     .insert({
@@ -65,8 +98,8 @@ export async function submitTicketAction(formData: FormData) {
   const ticketId = ticketData.id;
   const ticketNumber = ticketData.ticket_number;
 
-  // 4. Upload file to storage
-  if (hasFile) {
+  // 5. Upload file to storage
+  if (hasFile && file) {
     const timestamp = Date.now();
     const storagePath = `${ticketId}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
 
@@ -86,7 +119,7 @@ export async function submitTicketAction(formData: FormData) {
       return { error: "Failed to upload attachment. Please try again." };
     }
 
-    // 5. Insert attachment record
+    // 6. Insert attachment record
     const { error: attachmentError } = await supabase
       .from("attachments")
       .insert({
