@@ -1,8 +1,10 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { ticketSubmissionRateLimit } from "@/lib/rate-limit";
+import { sendNewTicketAdminAlert, sendTicketSubmissionConfirmation } from "@/lib/ticket-email";
 import { createTicketSchema } from "@/features/tickets/schemas/ticket";
 import {
   hasAcceptedAttachmentSignature,
@@ -23,8 +25,8 @@ export async function submitTicketAction(formData: FormData): Promise<SubmitTick
       if (!success) {
         return { error: "Too many ticket submissions. Please try again later." };
       }
-    } catch (error) {
-      console.error("Rate limiting error:", error);
+    } catch {
+      console.error("Ticket submission rate limiting failed.");
       // If Redis fails, allow the request to pass through to not break functionality
     }
   }
@@ -91,7 +93,7 @@ export async function submitTicketAction(formData: FormData): Promise<SubmitTick
     .single();
 
   if (ticketError) {
-    console.error("Error creating ticket:", ticketError);
+    console.error("Error creating ticket.");
     return { error: "Failed to create ticket." };
   }
 
@@ -111,7 +113,7 @@ export async function submitTicketAction(formData: FormData): Promise<SubmitTick
       });
 
     if (uploadError) {
-      console.error("Error uploading file:", uploadError);
+      console.error("Error uploading ticket attachment.");
       
       // Delete the ticket to prevent duplicate tickets on failure
       await supabase.from("tickets").delete().eq("id", ticketId);
@@ -131,12 +133,24 @@ export async function submitTicketAction(formData: FormData): Promise<SubmitTick
       });
 
     if (attachmentError) {
-      console.error("Error creating attachment record:", attachmentError);
+      console.error("Error creating ticket attachment record.");
       await supabase.storage.from("attachments").remove([storagePath]);
       await supabase.from("tickets").delete().eq("id", ticketId);
       return { error: "Failed to save attachment info. Please try again." };
     }
   }
+
+  const submitterEmail = ticketDataParsed.email;
+  after(async () => {
+    await Promise.all([
+      sendTicketSubmissionConfirmation(submitterEmail, ticketNumber).catch(() => {
+        console.error("Failed to send ticket submission confirmation.");
+      }),
+      sendNewTicketAdminAlert(ticketNumber).catch(() => {
+        console.error("Failed to send new ticket admin alert.");
+      }),
+    ]);
+  });
 
   return { success: true, ticketNumber };
 }

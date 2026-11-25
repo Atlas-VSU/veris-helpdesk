@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { sendGmailEmail } from "@/lib/gmail-smtp";
 import { OTP_EXPIRES_MINUTES } from "@/lib/otp";
 
 export async function sendOtpEmail(to: string, code: string): Promise<void> {
@@ -7,27 +7,13 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
     console.log(`[DEV] OTP for ${to}: ${code}`);
   }
 
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-
-  if (!user || !pass) {
-    console.error("OTP email not sent: GMAIL_USER or GMAIL_APP_PASSWORD is missing");
-    return;
-  }
-
   try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user, pass },
-    });
-
-    await transporter.sendMail({
-      from: `"Veris Helpdesk" <${user}>`,
+    await sendGmailEmail(
       to,
-      subject: "Your Veris Helpdesk verification code",
-      text: `Your verification code is ${code}. It expires in ${OTP_EXPIRES_MINUTES} minutes. If you did not ask for it, you can ignore this email.`,
-    });
-  } catch (err) {
-    console.error("Failed to send OTP email:", err);
+      "Your Veris Helpdesk verification code",
+      `Your verification code is ${code}. It expires in ${OTP_EXPIRES_MINUTES} minutes. If you did not ask for it, you can ignore this email.`,
+    );
+  } catch (error) {
+    console.error("OTP email not sent:", error instanceof Error ? error.message : "Gmail SMTP delivery failed");
   }
 }
