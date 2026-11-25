@@ -167,17 +167,52 @@ paths:
       summary: Get a client ticket and its conversation
       operationId: getMyTicket
       description: >
-        The ticket's email must match the email in the client session,
-        compared case-insensitively. A ticket belonging to another email
-        returns 404, never 403. Messages are sorted oldest first; attachments
-        are listed under the ticket.
+        Requires the verified owner's client_session. The ticket email is
+        compared case-insensitively with the session email. Missing tickets and
+        tickets belonging to another email return 404. Invalid ticket numbers
+        return 400. `messages[].id`, `attachments[].id`, and
+        `attachments[].message_id` are optional during rollout.
       security:
         - clientSession: []
       parameters:
         - $ref: "#/components/parameters/TicketNumber"
       responses:
         "200":
-          description: Ticket, messages, and attachments.
+          $ref: "#/components/responses/ClientTicketDetail"
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ClientTicketNotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/tickets/{ticketNumber}/messages:
+    post:
+      summary: Reply to a ticket as its verified owner
+      operationId: createClientTicketMessage
+      description: >
+        Planned operation. Requires client_session for the verified owner.
+        Ticket ownership is checked against the session email case-insensitively.
+        The reply quota is 10 requests per five minutes per verified email,
+        across tickets and independent of other quotas. After saving the reply,
+        create an entry in the admin inbox and email the shared admin mailbox.
+        Log inbox or email delivery failures and still return 201 for the saved reply.
+      security:
+        - clientSession: []
+      parameters:
+        - $ref: "#/components/parameters/TicketNumber"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientReplyInput"
+            example:
+              body: The duplicate charge appeared on my November statement.
+      responses:
+        "201":
+          description: Saved client message with an empty attachments array.
           content:
             application/json:
               schema:
@@ -186,27 +221,49 @@ paths:
                 properties:
                   data:
                     allOf:
-                      - $ref: "#/components/schemas/Ticket"
+                      - $ref: "#/components/schemas/SavedReply"
                       - type: object
                         properties:
-                          messages:
-                            type: array
-                            items:
-                              $ref: "#/components/schemas/Message"
+                          sender_type:
+                            type: string
+                            enum: [client]
                           attachments:
                             type: array
+                            maxItems: 0
                             items:
-                              $ref: "#/components/schemas/Attachment"
-        "404":
-          description: Ticket not found, including when it belongs to a different email.
+                              $ref: "#/components/schemas/ThreadAttachment"
+              example:
+                data:
+                  id: 565fa917-be6e-4ddd-a0c8-def4628aeb6e
+                  sender_type: client
+                  body: The duplicate charge appeared on my November statement.
+                  created_at: '2026-11-26T03:30:00Z'
+                  attachments: []
+        "400":
+          description: Invalid ticket number, invalid JSON or body, or a closed ticket.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TicketNotFoundError"
-        "400":
-          $ref: "#/components/responses/BadInput"
+                $ref: "#/components/schemas/Error"
+              examples:
+                invalidBody:
+                  value:
+                    error: Reply must contain 1 to 5,000 characters after trimming.
+                closedTicket:
+                  value:
+                    error: Ticket is closed.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ClientTicketNotFound"
+        "429":
+          description: The verified client exceeded the separate reply quota of 10 requests per five minutes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRateLimitError"
+              example:
+                error: Too many requests. Please try again later.
         "500":
           $ref: "#/components/responses/ServerError"
   /api/attachments/{attachmentId}:
@@ -392,19 +449,55 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
   /api/admin/tickets/{ticketNumber}:
-    patch:
-      summary: Update a ticket's status and/or priority
-      operationId: adminUpdateTicket
+    parameters:
+      - $ref: "#/components/parameters/TicketNumber"
+    get:
+      summary: Get a ticket and its conversation as an administrator
+      operationId: adminGetTicket
+      description: >
+        Planned operation. Requires admin_session and can retrieve any ticket.
+        Returns the same ticket and thread fields as client detail. Invalid
+        ticket numbers return 400.
       security:
         - adminSession: []
-      parameters:
-        - $ref: "#/components/parameters/TicketNumber"
+      responses:
+        "200":
+          $ref: "#/components/responses/TicketDetail"
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/TicketNotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    patch:
+      summary: Update a ticket's status, priority, or service
+      operationId: adminUpdateTicket
+      description: >
+        Requires admin_session. Changing the ticket's category through service
+        is planned. For the planned Reopen action, set `status` to `open` on a
+        `closed` ticket. For the planned Request info action, set `status` to
+        `waiting_for_client`. Send any explanatory message through
+        `POST /api/admin/tickets/{ticketNumber}/messages`.
+      security:
+        - adminSession: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/TicketUpdate"
+            examples:
+              changeService:
+                value:
+                  service: Billing
+              reopen:
+                value:
+                  status: open
+              requestInfo:
+                value:
+                  status: waiting_for_client
       responses:
         "200":
           description: Ticket updated.
@@ -416,12 +509,217 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/Ticket"
+              example:
+                data:
+                  id: b5b927b5-d9ab-4823-aaa9-473aabbe1efe
+                  ticket_number: TCK-2026-00001
+                  full_name: Alex Reyes
+                  email: alex@example.com
+                  user_type: subscriber
+                  service: Billing
+                  subject: Duplicate charge
+                  description: My subscription was charged twice.
+                  priority: medium
+                  status: waiting_for_client
+                  consent_given: true
+                  created_at: '2026-11-26T03:00:00Z'
+                  updated_at: '2026-11-26T03:10:00Z'
+        "400":
+          description: Invalid ticket number, invalid JSON, or invalid ticket update fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Invalid ticket update
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/TicketNotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/admin/tickets/{ticketNumber}/messages:
+    post:
+      summary: Reply to a ticket as an administrator
+      operationId: adminCreateTicketMessage
+      description: >
+        Planned operation. Requires admin_session. If file storage or attachment
+        metadata persistence fails, return 500, roll back the reply, and clean
+        up any partially saved attachment data. Email the client only after the
+        reply and any attachment are saved. Log email delivery failures and
+        still return 201 for the saved reply.
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: "#/components/parameters/TicketNumber"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AdminReplyInput"
+            encoding:
+              attachment:
+                contentType: image/jpeg, image/png, application/pdf
+            examples:
+              textOnly:
+                value:
+                  body: Could you confirm the statement date?
+              withAttachment:
+                value:
+                  body: I've attached the refund confirmation.
+                  attachment: '<binary PDF>'
+      responses:
+        "201":
+          description: Saved admin message with its attachment, or an empty attachments array.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/SavedReply"
+                      - type: object
+                        properties:
+                          sender_type:
+                            type: string
+                            enum: [admin]
+              example:
+                data:
+                  id: 17151769-2598-45ec-99f5-141279c288a1
+                  sender_type: admin
+                  body: I've attached the refund confirmation.
+                  created_at: '2026-11-26T04:00:00Z'
+                  attachments:
+                    - id: 3e2f70f2-be91-4f09-8281-f06d24922e9c
+                      message_id: 17151769-2598-45ec-99f5-141279c288a1
+                      file_name: refund-confirmation.pdf
+                      file_type: application/pdf
+                      file_size: 24576
+        "400":
+          description: Invalid ticket number, invalid multipart body or attachment, or a closed ticket.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                invalidAttachment:
+                  value:
+                    error: Please upload a JPG, PNG, or PDF file.
+                closedTicket:
+                  value:
+                    error: Ticket is closed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/TicketNotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/admin/notifications:
+    get:
+      summary: List entries in the shared admin inbox
+      operationId: adminListNotifications
+      description: >
+        Planned operation. Requires admin_session. Returns up to 50 entries,
+        ordered by created_at newest first. All admins see the same entries
+        and read state.
+      security:
+        - adminSession: []
+      responses:
+        "200":
+          description: Inbox entries, or an empty data array if the inbox is empty.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    maxItems: 50
+                    items:
+                      $ref: "#/components/schemas/Notification"
+              example:
+                data:
+                  - id: 50165ed7-7cdf-4de9-a64f-9368a30b1238
+                    message: Client replied to TCK-2026-00001.
+                    is_read: false
+                    created_at: '2026-11-26T03:30:01Z'
+                    ticket_number: TCK-2026-00001
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/admin/notifications/{notificationId}:
+    parameters:
+      - $ref: "#/components/parameters/NotificationId"
+    patch:
+      summary: Mark a notification as read
+      operationId: adminMarkNotificationRead
+      description: >
+        Planned operation. Requires admin_session. Marks the entry as read
+        for all admins. Invalid notification IDs or request bodies return 400.
+      security:
+        - adminSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationReadInput"
+            example:
+              is_read: true
+      responses:
+        "200":
+          description: Updated inbox entry with is_read set to true.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/Notification"
+                      - type: object
+                        properties:
+                          is_read:
+                            type: boolean
+                            enum: [true]
+              example:
+                data:
+                  id: 50165ed7-7cdf-4de9-a64f-9368a30b1238
+                  message: Client replied to TCK-2026-00001.
+                  is_read: true
+                  created_at: '2026-11-26T03:30:01Z'
+                  ticket_number: TCK-2026-00001
         "400":
           $ref: "#/components/responses/BadInput"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
-          $ref: "#/components/responses/TicketNotFound"
+          $ref: "#/components/responses/NotificationNotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      summary: Delete a notification
+      operationId: adminDeleteNotification
+      description: >
+        Planned operation. Requires admin_session. Removes the entry from the
+        shared inbox for all admins. Invalid notification IDs return 400.
+      security:
+        - adminSession: []
+      responses:
+        "204":
+          description: Notification deleted. The response has no body.
+        "400":
+          $ref: "#/components/responses/BadInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotificationNotFound"
         "500":
           $ref: "#/components/responses/ServerError"
 components:
@@ -469,6 +767,51 @@ components:
       schema:
         type: string
         format: uuid
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        example: 50165ed7-7cdf-4de9-a64f-9368a30b1238
+  examples:
+    TicketDetail:
+      value:
+        data:
+          id: b5b927b5-d9ab-4823-aaa9-473aabbe1efe
+          ticket_number: TCK-2026-00001
+          full_name: Alex Reyes
+          email: alex@example.com
+          user_type: subscriber
+          service: Billing
+          subject: Duplicate charge
+          description: My subscription was charged twice.
+          priority: medium
+          status: waiting_for_client
+          consent_given: true
+          created_at: '2026-11-26T03:00:00Z'
+          updated_at: '2026-11-26T03:10:00Z'
+          messages:
+            - id: 565fa917-be6e-4ddd-a0c8-def4628aeb6e
+              sender_type: client
+              body: The duplicate charge appeared on my November statement.
+              created_at: '2026-11-26T03:30:00Z'
+            - id: 17151769-2598-45ec-99f5-141279c288a1
+              sender_type: admin
+              body: I've attached the refund confirmation.
+              created_at: '2026-11-26T04:00:00Z'
+          attachments:
+            - id: cf101adb-d35d-4052-a418-6c359189156a
+              message_id: null
+              file_name: statement.pdf
+              file_type: application/pdf
+              file_size: 32768
+            - id: 3e2f70f2-be91-4f09-8281-f06d24922e9c
+              message_id: 17151769-2598-45ec-99f5-141279c288a1
+              file_name: refund-confirmation.pdf
+              file_type: application/pdf
+              file_size: 24576
   responses:
     BadInput:
       description: Bad input.
@@ -482,12 +825,52 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    ClientTicketDetail:
+      description: Ticket with oldest-first messages and attachment metadata. Thread IDs are optional during rollout.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/ClientTicketDetail"
+          examples:
+            withThreadIds:
+              $ref: "#/components/examples/TicketDetail"
+    TicketDetail:
+      description: Ticket with oldest-first messages and attachment metadata.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/TicketDetail"
+          examples:
+            withThreadIds:
+              $ref: "#/components/examples/TicketDetail"
     TicketNotFound:
       description: Ticket not found.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/TicketNotFoundError"
+    ClientTicketNotFound:
+      description: Ticket not found, including when it belongs to a different email.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TicketNotFoundError"
+    NotificationNotFound:
+      description: Notification not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Notification not found
     AttachmentNotFound:
       description: Attachment not found, including when it belongs to a different email.
       content:
@@ -674,10 +1057,43 @@ components:
         updated_at:
           type: string
           format: date-time
-    Message:
+    ClientTicketDetail:
+      allOf:
+        - $ref: "#/components/schemas/Ticket"
+        - type: object
+          required: [messages, attachments]
+          properties:
+            messages:
+              type: array
+              description: Messages sorted by created_at oldest first. Empty when there are no replies.
+              items:
+                $ref: "#/components/schemas/ClientThreadMessage"
+            attachments:
+              type: array
+              description: Original submission and reply files. Empty when there are no files.
+              items:
+                $ref: "#/components/schemas/ClientThreadAttachment"
+    TicketDetail:
+      allOf:
+        - $ref: "#/components/schemas/ClientTicketDetail"
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/Message"
+            attachments:
+              type: array
+              items:
+                $ref: "#/components/schemas/ThreadAttachment"
+    ClientThreadMessage:
       type: object
       required: [sender_type, body, created_at]
       properties:
+        id:
+          type: string
+          format: uuid
+          description: Matches message_id on attached files.
         sender_type:
           type: string
           enum: [client, admin]
@@ -686,6 +1102,11 @@ components:
         created_at:
           type: string
           format: date-time
+    Message:
+      allOf:
+        - $ref: "#/components/schemas/ClientThreadMessage"
+        - type: object
+          required: [id]
     Attachment:
       type: object
       required: [file_name, file_type, file_size]
@@ -696,6 +1117,27 @@ components:
           type: string
         file_size:
           type: integer
+    ClientThreadAttachment:
+      allOf:
+        - $ref: "#/components/schemas/Attachment"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Pass this value to `GET /api/attachments/{attachmentId}` for a signed download URL.
+            message_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: >
+                Identifies the reply that owns the file. Null identifies an
+                original submission file.
+    ThreadAttachment:
+      allOf:
+        - $ref: "#/components/schemas/ClientThreadAttachment"
+        - type: object
+          required: [id, message_id]
     AttachmentDownload:
       allOf:
         - $ref: "#/components/schemas/Attachment"
@@ -717,3 +1159,78 @@ components:
           $ref: "#/components/schemas/TicketStatus"
         priority:
           $ref: "#/components/schemas/Priority"
+        service:
+          type: string
+          enum: [Billing, Technical Support, General Inquiry]
+          description: Planned field for updating the ticket's existing service.
+    ReplyBody:
+      type: string
+      description: >
+        Trim leading and trailing whitespace before validating and saving.
+        The trimmed body must contain 1 to 5,000 characters.
+      pattern: '^\s*\S(?:[\s\S]{0,4998}\S)?\s*$'
+    ClientReplyInput:
+      type: object
+      required: [body]
+      additionalProperties: false
+      properties:
+        body:
+          $ref: "#/components/schemas/ReplyBody"
+    AdminReplyInput:
+      type: object
+      required: [body]
+      additionalProperties: false
+      properties:
+        body:
+          $ref: "#/components/schemas/ReplyBody"
+        attachment:
+          type: string
+          format: binary
+          description: >
+            One optional non-empty JPG, PNG, or PDF, at most 10 MB (10,485,760 bytes).
+            The file signature must match the declared MIME type.
+    SavedReply:
+      allOf:
+        - $ref: "#/components/schemas/Message"
+        - type: object
+          required: [attachments]
+          properties:
+            attachments:
+              type: array
+              maxItems: 1
+              description: Saved attachments for this reply. Each message_id equals the saved message's id.
+              items:
+                allOf:
+                  - $ref: "#/components/schemas/ThreadAttachment"
+                  - type: object
+                    properties:
+                      message_id:
+                        type: string
+    Notification:
+      type: object
+      description: Planned shared admin inbox entry.
+      required: [id, message, is_read, created_at, ticket_number]
+      properties:
+        id:
+          type: string
+          format: uuid
+        message:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        ticket_number:
+          type: string
+          pattern: "^TCK-[0-9]{4}-[0-9]{5}$"
+          nullable: true
+          description: Linked ticket number. Null when the entry has no linked ticket.
+    NotificationReadInput:
+      type: object
+      required: [is_read]
+      additionalProperties: false
+      properties:
+        is_read:
+          type: boolean
+          enum: [true]
