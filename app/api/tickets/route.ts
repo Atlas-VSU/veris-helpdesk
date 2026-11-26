@@ -9,6 +9,8 @@ import {
 import { errorResponse, handleApiError } from "@/lib/api-error";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "private, no-store" };
+const CLIENT_TICKET_LIST_SELECT =
+  "id, ticket_number, full_name, email, user_type, service, subject, description, priority, status, consent_given, created_at, updated_at";
 
 export async function GET(request: Request) {
   try {
@@ -32,7 +34,7 @@ export async function GET(request: Request) {
     const requestedStatus = status && isTicketStatus(status) ? status : undefined;
     let query = getSupabaseServerClient()
       .from("tickets")
-      .select("id, ticket_number, subject, description, priority, status, service, created_at, updated_at")
+      .select(CLIENT_TICKET_LIST_SELECT)
       .ilike("email", escapeLikePattern(verifiedEmail))
       .order("created_at", { ascending: false });
 
