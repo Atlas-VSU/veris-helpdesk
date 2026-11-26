@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import bcrypt from "bcryptjs";
-import { AdminRow } from "@/types/database";
 import { checkAuthRateLimit, loginRateLimit } from "@/lib/rate-limit";
 import { adminLoginSchema } from "@/features/admin/schemas/admin";
-import { errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
+import { ApiError, errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
 import {
   ADMIN_COOKIE_NAME,
   getAdminCookieOptions,
@@ -40,9 +39,11 @@ export async function POST(request: Request) {
       .from("admins")
       .select("id, email, password_hash, full_name")
       .eq("email", email)
-      .single<AdminRow>();
+      .maybeSingle();
 
-    if (error || !admin) {
+    if (error) throw ApiError.internal(undefined, { cause: error });
+
+    if (!admin) {
       return errorResponse(401, "Invalid email or password");
     }
 

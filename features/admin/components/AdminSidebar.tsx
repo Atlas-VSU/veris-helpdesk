@@ -14,19 +14,19 @@ import {
   Tag,
   History,
   Settings,
-  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AdminLogoutButton } from "./AdminLogoutButton";
 
-type NavItem = {
+export type NavItem = {
   href: string;
   label: string;
   icon: React.ElementType;
   match: (p: string) => boolean;
 };
 
-const NAV_ITEMS: NavItem[] = [
+export const ADMIN_NAV_ITEMS: NavItem[] = [
   {
     href: "/admin/dashboard",
     label: "Dashboard",
@@ -90,7 +90,7 @@ export function AdminSidebar() {
 
       {/* Nav */}
       <nav aria-label="Admin navigation" className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
+        {ADMIN_NAV_ITEMS.map((item) => {
           const active = item.match(pathname);
           const Icon = item.icon;
 
@@ -138,15 +138,7 @@ export function AdminSidebar() {
           <Settings aria-hidden="true" className="size-4 shrink-0" />
           Settings
         </Link>
-        <form action="/api/admin/logout" method="POST">
-          <button
-            type="submit"
-            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 duration-fast"
-          >
-            <LogOut aria-hidden="true" className="size-4 shrink-0" />
-            Logout
-          </button>
-        </form>
+        <AdminLogoutButton />
       </div>
     </aside>
   );
