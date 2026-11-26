@@ -20,12 +20,15 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
     uploadError = null,
     metadataError = null,
     lostRpcResponseError = null,
+    finishSaveAfterLookupError = null,
     deleteMessageError = null,
     initialMessages = [],
   } = {}) {
     let currentUploadError = uploadError;
     let currentMetadataError = metadataError;
     let currentLostRpcResponseError = lostRpcResponseError;
+    let currentFinishSaveAfterLookupError = finishSaveAfterLookupError;
+    let pendingLateSave = null;
     const operations = [];
     const uploadedObjects = [];
     const savedMessages = initialMessages.map((msg) => ({ ...msg }));
@@ -72,11 +75,11 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
           body: params.p_body,
           created_at: "2026-11-26T04:00:00Z",
         };
-        savedMessages.push(messageRecord);
 
         const attachments = [];
+        let attachmentRecord = null;
         if (params.p_storage_path !== null && params.p_storage_path !== undefined) {
-          const attachmentRecord = {
+          attachmentRecord = {
             id: ATTACHMENT_ID,
             ticket_id: messageRecord.ticket_id,
             message_id: messageRecord.id,
@@ -85,7 +88,6 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
             file_size: params.p_file_size,
             storage_path: params.p_storage_path,
           };
-          savedAttachments.push(attachmentRecord);
           attachments.push({
             id: attachmentRecord.id,
             message_id: attachmentRecord.message_id,
@@ -94,6 +96,20 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
             file_size: attachmentRecord.file_size,
           });
         }
+
+        const commitRecords = () => {
+          savedMessages.push(messageRecord);
+          if (attachmentRecord) {
+            savedAttachments.push(attachmentRecord);
+          }
+        };
+
+        if (currentFinishSaveAfterLookupError) {
+          pendingLateSave = commitRecords;
+          return { data: null, error: currentFinishSaveAfterLookupError };
+        }
+
+        commitRecords();
 
         if (currentLostRpcResponseError) {
           return { data: null, error: currentLostRpcResponseError };
@@ -119,6 +135,11 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
                 maybeSingle: async () => {
                   operations.push({ type: "select_message", columns, filters: { [col]: val } });
                   const found = savedMessages.find((item) => item[col] === val) ?? null;
+                  if (pendingLateSave) {
+                    const finalizeSave = pendingLateSave;
+                    pendingLateSave = null;
+                    finalizeSave();
+                  }
                   return { data: found, error: null };
                 },
               }),
@@ -146,6 +167,15 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
 
         if (table === "attachments") {
           return {
+            select: (columns) => ({
+              eq: (col, val) => ({
+                maybeSingle: async () => {
+                  operations.push({ type: "select_attachment", columns, filters: { [col]: val } });
+                  const found = savedAttachments.find((item) => item[col] === val) ?? null;
+                  return { data: found, error: null };
+                },
+              }),
+            }),
             insert: (payload) => ({
               select: (columns) => ({
                 single: async () => {
@@ -387,9 +417,54 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
     );
   });
 
-  await t.test("regression: preserves uploaded file when the database saves the reply but the RPC response is lost", async () => {
+  await t.test("regression: returns saved reply and preserves uploaded file when the database saves the reply and attachment but the RPC response is lost", async () => {
     const ctx = setup({
       lostRpcResponseError: new Error("Network response lost after database commit"),
+    });
+    const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
+
+    const savedReply = await ctx.persistAdminReplyWithAttachment({
+      ticketId: TICKET_ID,
+      adminId: ADMIN_ID,
+      messageId: MESSAGE_ID,
+      body: "  I've attached the refund confirmation.  ",
+      file,
+    });
+
+    assert.deepEqual(savedReply, {
+      id: MESSAGE_ID,
+      sender_type: "admin",
+      body: "I've attached the refund confirmation.",
+      created_at: "2026-11-26T04:00:00Z",
+      attachments: [
+        {
+          id: ATTACHMENT_ID,
+          message_id: MESSAGE_ID,
+          file_name: "refund-confirmation.pdf",
+          file_type: "application/pdf",
+          file_size: file.size,
+        },
+      ],
+    });
+    assert.equal(ctx.savedMessages.length, 1);
+    assert.equal(ctx.savedMessages[0].id, MESSAGE_ID);
+    assert.equal(ctx.savedAttachments.length, 1);
+    assert.equal(ctx.uploadedObjects.length, 1);
+    assert.equal(ctx.uploadedObjects[0], ctx.savedAttachments[0].storage_path);
+    assert.deepEqual(
+      ctx.operations.map((op) => op.type),
+      [
+        "upload",
+        "rpc_create_admin_reply_with_attachment",
+        "select_message",
+        "select_attachment",
+      ],
+    );
+  });
+
+  await t.test("regression: does not delete uploaded file when the database is still saving during the lookup and the save finishes after the lookup", async () => {
+    const ctx = setup({
+      finishSaveAfterLookupError: new Error("RPC timed out while database was still saving"),
     });
     const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
 
@@ -405,6 +480,7 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
       (err) => err.status === 500 && err.message === "Failed to save attachment info. Please try again.",
     );
 
+    // The save completed after the lookup returned an empty result, and the file it references is preserved.
     assert.equal(ctx.savedMessages.length, 1);
     assert.equal(ctx.savedMessages[0].id, MESSAGE_ID);
     assert.equal(ctx.savedAttachments.length, 1);

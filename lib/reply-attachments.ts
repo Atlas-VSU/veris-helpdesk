@@ -102,23 +102,178 @@ export function extractOptionalReplyAttachment(
   return entry;
 }
 
-async function isReplyMessageSaved(
+type SavedReplyMessageLookupRow = {
+  id: string;
+  ticket_id?: string;
+  sender_type?: string;
+  body?: string;
+  created_at?: string;
+  attachments?: Array<{
+    id: string;
+    message_id?: string | null;
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    storage_path?: string;
+  }>;
+};
+
+type SavedReplyAttachmentLookupRow = {
+  id: string;
+  message_id?: string | null;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_path?: string;
+};
+
+type SavedReplyLookupResult =
+  | { status: "saved"; reply: SavedAdminReply }
+  | { status: "not_found" }
+  | { status: "unconfirmed" };
+
+const UNCONFIRMED_TRANSPORT_ERROR_PATTERN =
+  /\b(lost|timeout|timed\s*out|network|fetch\s+failed|econnreset|etimedout|socket|hang\s+up|disconnected|connection\s+(?:reset|closed|lost|dropped|refused)|in[- ]?flight|still\s+saving|still\s+in\s+progress|response\s+lost|gateway|unavailable)\b/i;
+
+const CONFIRMED_ROLLBACK_ERROR_PATTERN =
+  /\b(rolled\s*back|rollback|transaction\s+(?:failed|aborted|rolled\s*back)|attachment\s+metadata\s+is\s+incomplete|violates\s+(?:foreign\s+key|unique|check|not-null)\s+constraint|duplicate\s+key|null\s+value\s+in\s+column|invalid\s+input\s+syntax)\b/i;
+
+const POSTGRES_SQLSTATE_CODE_PATTERN = /^[0-9A-Z]{5}$/;
+
+export function isConfirmedTransactionRollback(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as {
+    code?: unknown;
+    name?: unknown;
+    message?: unknown;
+    rollbackConfirmed?: unknown;
+    rolledBack?: unknown;
+  };
+
+  if (typeof candidate.rollbackConfirmed === "boolean") {
+    return candidate.rollbackConfirmed;
+  }
+
+  if (typeof candidate.rolledBack === "boolean") {
+    return candidate.rolledBack;
+  }
+
+  const name = typeof candidate.name === "string" ? candidate.name : "";
+  if (name === "AbortError" || name === "TimeoutError") {
+    return false;
+  }
+
+  const code = typeof candidate.code === "string" ? candidate.code.trim() : "";
+  const message = typeof candidate.message === "string" ? candidate.message : "";
+
+  if (UNCONFIRMED_TRANSPORT_ERROR_PATTERN.test(message) || UNCONFIRMED_TRANSPORT_ERROR_PATTERN.test(code)) {
+    return false;
+  }
+
+  if (code && POSTGRES_SQLSTATE_CODE_PATTERN.test(code)) {
+    return true;
+  }
+
+  return CONFIRMED_ROLLBACK_ERROR_PATTERN.test(message);
+}
+
+async function lookupSavedReplyWithAttachment(
   supabase: ReturnType<typeof getSupabaseServerClient>,
-  messageId: string,
-  ticketId: string,
-): Promise<boolean> {
-  const { data: replyRow, error: replyLookupError } = await supabase
+   {
+    messageId,
+    ticketId,
+    fallbackBody,
+    expectAttachment,
+    expectedStoragePath,
+  }: {
+    messageId: string;
+    ticketId: string;
+    fallbackBody: string;
+    expectAttachment: boolean;
+    expectedStoragePath: string | null;
+  },
+): Promise<SavedReplyLookupResult> {
+  const { data: rawReplyRow, error: replyLookupError } = await supabase
     .from("messages")
-    .select("id, ticket_id")
+    .select("id, ticket_id, sender_type, body, created_at")
     .eq("id", messageId)
     .maybeSingle();
 
   if (replyLookupError) {
     console.error("Error checking whether reply message was saved before removing attachment.");
-    return true;
+    return { status: "unconfirmed" };
   }
 
-  return Boolean(replyRow && (!replyRow.ticket_id || replyRow.ticket_id === ticketId));
+  const replyRow = rawReplyRow as SavedReplyMessageLookupRow | null;
+  if (!replyRow) {
+    return { status: "not_found" };
+  }
+
+  if (replyRow.ticket_id && replyRow.ticket_id !== ticketId) {
+    return { status: "unconfirmed" };
+  }
+
+  let savedAttachments: ThreadAttachment[] = [];
+
+  if (expectAttachment) {
+    const embeddedAttachment = Array.isArray(replyRow.attachments)
+      ? replyRow.attachments[0]
+      : undefined;
+
+    let attachmentRow: SavedReplyAttachmentLookupRow | null = embeddedAttachment ?? null;
+
+    if (!attachmentRow) {
+      const { data: rawAttachmentRow, error: attachmentLookupError } = await supabase
+        .from("attachments")
+        .select("id, message_id, file_name, file_type, file_size, storage_path")
+        .eq("message_id", messageId)
+        .maybeSingle();
+
+      if (attachmentLookupError) {
+        console.error("Error checking whether reply attachment metadata was saved.");
+        return { status: "unconfirmed" };
+      }
+
+      attachmentRow = rawAttachmentRow as SavedReplyAttachmentLookupRow | null;
+    }
+
+    if (!attachmentRow) {
+      return { status: "unconfirmed" };
+    }
+
+    if (
+      expectedStoragePath &&
+      typeof attachmentRow.storage_path === "string" &&
+      attachmentRow.storage_path !== expectedStoragePath
+    ) {
+      return { status: "unconfirmed" };
+    }
+
+    savedAttachments = [
+      {
+        id: attachmentRow.id,
+        message_id: attachmentRow.message_id ?? replyRow.id,
+        file_name: attachmentRow.file_name,
+        file_type: attachmentRow.file_type,
+        file_size: attachmentRow.file_size,
+      },
+    ];
+  }
+
+  return {
+    status: "saved",
+    reply: {
+      id: replyRow.id,
+      sender_type: "admin",
+      body: typeof replyRow.body === "string" ? replyRow.body : fallbackBody,
+      created_at:
+        typeof replyRow.created_at === "string" ? replyRow.created_at : new Date().toISOString(),
+      attachments: savedAttachments,
+    },
+  };
 }
 
 export async function persistAdminReplyWithAttachment({
@@ -192,15 +347,24 @@ export async function persistAdminReplyWithAttachment({
   const result = rawResult as AtomicReplyRpcResult | null;
 
   if (txError || !result || (file && (!result.attachments || result.attachments.length === 0))) {
+    const lookup = await lookupSavedReplyWithAttachment(supabase, {
+      messageId: resolvedMessageId,
+      ticketId: parsed.data.ticketId,
+      fallbackBody: parsed.data.body,
+      expectAttachment: Boolean(file),
+      expectedStoragePath: storagePath,
+    });
+
+    if (lookup.status === "saved") {
+      return lookup.reply;
+    }
+
     if (storagePath) {
       console.error("Error creating reply and attachment metadata in transaction.");
-      const replyWasSaved = await isReplyMessageSaved(
-        supabase,
-        resolvedMessageId,
-        parsed.data.ticketId,
-      );
+      const shouldRemoveUploadedFile =
+        lookup.status === "not_found" && isConfirmedTransactionRollback(txError);
 
-      if (!replyWasSaved) {
+      if (shouldRemoveUploadedFile) {
         const { error: removeError } = await supabase.storage
           .from(ATTACHMENTS_BUCKET)
           .remove([storagePath]);
