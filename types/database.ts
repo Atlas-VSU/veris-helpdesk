@@ -45,3 +45,13 @@ export type Attachment = {
   created_at: string;
 };
 
+export type ThreadAttachment = {
+  id: string;
+  message_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+};
+
+
+
