@@ -102,6 +102,25 @@ export function extractOptionalReplyAttachment(
   return entry;
 }
 
+async function isReplyMessageSaved(
+  supabase: ReturnType<typeof getSupabaseServerClient>,
+  messageId: string,
+  ticketId: string,
+): Promise<boolean> {
+  const { data: replyRow, error: replyLookupError } = await supabase
+    .from("messages")
+    .select("id, ticket_id")
+    .eq("id", messageId)
+    .maybeSingle();
+
+  if (replyLookupError) {
+    console.error("Error checking whether reply message was saved before removing attachment.");
+    return true;
+  }
+
+  return Boolean(replyRow && (!replyRow.ticket_id || replyRow.ticket_id === ticketId));
+}
+
 export async function persistAdminReplyWithAttachment({
   ticketId,
   body,
@@ -175,11 +194,19 @@ export async function persistAdminReplyWithAttachment({
   if (txError || !result || (file && (!result.attachments || result.attachments.length === 0))) {
     if (storagePath) {
       console.error("Error creating reply and attachment metadata in transaction.");
-      const { error: removeError } = await supabase.storage
-        .from(ATTACHMENTS_BUCKET)
-        .remove([storagePath]);
-      if (removeError) {
-        console.error("Error removing uploaded reply attachment after metadata failure.");
+      const replyWasSaved = await isReplyMessageSaved(
+        supabase,
+        resolvedMessageId,
+        parsed.data.ticketId,
+      );
+
+      if (!replyWasSaved) {
+        const { error: removeError } = await supabase.storage
+          .from(ATTACHMENTS_BUCKET)
+          .remove([storagePath]);
+        if (removeError) {
+          console.error("Error removing uploaded reply attachment after metadata failure.");
+        }
       }
 
       throw ApiError.internal("Failed to save attachment info. Please try again.", {

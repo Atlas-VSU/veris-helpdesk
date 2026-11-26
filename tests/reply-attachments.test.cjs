@@ -19,11 +19,13 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
   function setup({
     uploadError = null,
     metadataError = null,
+    lostRpcResponseError = null,
     deleteMessageError = null,
     initialMessages = [],
   } = {}) {
     let currentUploadError = uploadError;
     let currentMetadataError = metadataError;
+    let currentLostRpcResponseError = lostRpcResponseError;
     const operations = [];
     const uploadedObjects = [];
     const savedMessages = initialMessages.map((msg) => ({ ...msg }));
@@ -91,6 +93,10 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
             file_type: attachmentRecord.file_type,
             file_size: attachmentRecord.file_size,
           });
+        }
+
+        if (currentLostRpcResponseError) {
+          return { data: null, error: currentLostRpcResponseError };
         }
 
         return {
@@ -377,7 +383,36 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
     assert.equal(ctx.savedAttachments.length, 0);
     assert.deepEqual(
       ctx.operations.map((op) => op.type),
-      ["upload", "rpc_create_admin_reply_with_attachment", "remove"],
+      ["upload", "rpc_create_admin_reply_with_attachment", "select_message", "remove"],
+    );
+  });
+
+  await t.test("regression: preserves uploaded file when the database saves the reply but the RPC response is lost", async () => {
+    const ctx = setup({
+      lostRpcResponseError: new Error("Network response lost after database commit"),
+    });
+    const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
+
+    await assert.rejects(
+      () =>
+        ctx.persistAdminReplyWithAttachment({
+          ticketId: TICKET_ID,
+          adminId: ADMIN_ID,
+          messageId: MESSAGE_ID,
+          body: "I've attached the refund confirmation.",
+          file,
+        }),
+      (err) => err.status === 500 && err.message === "Failed to save attachment info. Please try again.",
+    );
+
+    assert.equal(ctx.savedMessages.length, 1);
+    assert.equal(ctx.savedMessages[0].id, MESSAGE_ID);
+    assert.equal(ctx.savedAttachments.length, 1);
+    assert.equal(ctx.uploadedObjects.length, 1);
+    assert.equal(ctx.uploadedObjects[0], ctx.savedAttachments[0].storage_path);
+    assert.deepEqual(
+      ctx.operations.map((op) => op.type),
+      ["upload", "rpc_create_admin_reply_with_attachment", "select_message"],
     );
   });
 
