@@ -45,3 +45,40 @@ export type Attachment = {
   created_at: string;
 };
 
+export type ThreadAttachment = {
+  id: string;
+  message_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+};
+
+export type SavedAdminReply = {
+  id: string;
+  sender_type: "admin";
+  body: string;
+  created_at: string;
+  attachments: ThreadAttachment[];
+};
+
+export type NotificationEventType = "new_ticket" | "client_reply";
+
+export type NotificationRow = {
+  id: string;
+  ticket_id: string | null;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type AdminNotification = {
+  id: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  ticket_number: string | null;
+};
+
+
+
+

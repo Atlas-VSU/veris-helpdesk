@@ -78,6 +78,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "attachments_message_ticket_fkey"
+            columns: ["message_id", "ticket_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id", "ticket_id"]
+          },
+          {
             foreignKeyName: "attachments_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
@@ -243,6 +250,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_admin_reply_with_attachment: {
+        Args: {
+          p_ticket_id: string
+          p_body: string
+          p_admin_id?: string | null
+          p_message_id?: string
+          p_file_name?: string | null
+          p_file_type?: string | null
+          p_file_size?: number | null
+          p_storage_path?: string | null
+        }
+        Returns: Json
+      }
       get_admin_dashboard_counts: {
         Args: Record<PropertyKey, never>
         Returns: {

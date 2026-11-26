@@ -43,3 +43,17 @@ export async function hasAcceptedAttachmentSignature(file: File) {
 
   return false;
 }
+
+export async function validateAttachmentFile(file: File): Promise<string | null> {
+  const metadataError = validateAttachmentMetadata(file);
+  if (metadataError) {
+    return metadataError;
+  }
+
+  if (!(await hasAcceptedAttachmentSignature(file))) {
+    return "The file contents do not match its declared type.";
+  }
+
+  return null;
+}
+
