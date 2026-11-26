@@ -43,6 +43,18 @@ export class UnauthorizedAdminError extends Error {
   }
 }
 
+type DashboardCountsRow =
+  Database["public"]["Functions"]["get_admin_dashboard_counts"]["Returns"][number];
+
+const STATUS_COUNT_COLUMNS: Record<TicketStatus, keyof DashboardCountsRow> = {
+  new: "new_count",
+  open: "open_count",
+  in_progress: "in_progress_count",
+  waiting_for_client: "waiting_for_client_count",
+  resolved: "resolved_count",
+  closed: "closed_count",
+};
+
 const RECENT_TICKET_SELECT = `
   id,
   ticket_number,
@@ -59,13 +71,57 @@ function normalizeRecentLimit(recentLimit?: number): number {
     return DEFAULT_RECENT_TICKETS_LIMIT;
   }
 
-  if (!Number.isInteger(recentLimit) || recentLimit < 1 || recentLimit > MAX_RECENT_TICKETS_LIMIT) {
+  if (
+    !Number.isInteger(recentLimit) ||
+    recentLimit < 1 ||
+    recentLimit > MAX_RECENT_TICKETS_LIMIT
+  ) {
     throw new RangeError(
       `recentLimit must be an integer between 1 and ${MAX_RECENT_TICKETS_LIMIT}`,
     );
   }
 
   return recentLimit;
+}
+
+function requireCount(
+  row: Record<string, unknown>,
+  field: keyof DashboardCountsRow,
+): number {
+  const value = row[field];
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new Error(`Missing or invalid dashboard count: ${field}`);
+  }
+  return value;
+}
+
+function parseDashboardCounts(data: unknown): {
+  totalTickets: number;
+  urgentTickets: number;
+  statusCounts: TicketStatusCounts;
+} {
+  if (!Array.isArray(data) || data.length !== 1) {
+    throw new Error(
+      "Dashboard counts query returned an invalid or empty response",
+    );
+  }
+
+  const row = data[0];
+  if (row === null || typeof row !== "object") {
+    throw new Error("Dashboard counts query returned an invalid row");
+  }
+
+  const record = row as Record<string, unknown>;
+  const statusCounts = {} as TicketStatusCounts;
+  for (const status of TICKET_STATUSES) {
+    statusCounts[status] = requireCount(record, STATUS_COUNT_COLUMNS[status]);
+  }
+
+  return {
+    totalTickets: requireCount(record, "total_tickets"),
+    urgentTickets: requireCount(record, "urgent_tickets"),
+    statusCounts,
+  };
 }
 
 export async function getAdminDashboardData(
@@ -79,42 +135,33 @@ export async function getAdminDashboardData(
   const recentLimit = normalizeRecentLimit(options.recentLimit);
   const supabase = getSupabaseServerClient();
 
-  const [totalResult, urgentResult, recentResult, ...statusResults] =
-    await Promise.all([
-      supabase.from("tickets").select("id", { count: "exact", head: true }),
-      supabase
-        .from("tickets")
-        .select("id", { count: "exact", head: true })
-        .eq("priority", "urgent"),
-      supabase
-        .from("tickets")
-        .select(RECENT_TICKET_SELECT)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(recentLimit),
-      ...TICKET_STATUSES.map((status) =>
-        supabase
-          .from("tickets")
-          .select("id", { count: "exact", head: true })
-          .eq("status", status),
-      ),
-    ]);
+  const [countsResult, recentResult] = await Promise.all([
+    supabase.rpc("get_admin_dashboard_counts"),
+    supabase
+      .from("tickets")
+      .select(RECENT_TICKET_SELECT)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(recentLimit),
+  ]);
 
-  if (totalResult.error) throw totalResult.error;
-  if (urgentResult.error) throw urgentResult.error;
+  if (countsResult.error) throw countsResult.error;
   if (recentResult.error) throw recentResult.error;
 
-  const statusCounts = {} as TicketStatusCounts;
-  TICKET_STATUSES.forEach((status, index) => {
-    const result = statusResults[index];
-    if (result.error) throw result.error;
-    statusCounts[status] = result.count ?? 0;
-  });
+  const { totalTickets, urgentTickets, statusCounts } = parseDashboardCounts(
+    countsResult.data,
+  );
+
+  if (!Array.isArray(recentResult.data)) {
+    throw new Error(
+      "Recent tickets query returned an invalid or empty response",
+    );
+  }
 
   return {
-    totalTickets: totalResult.count ?? 0,
-    urgentTickets: urgentResult.count ?? 0,
+    totalTickets,
+    urgentTickets,
     statusCounts,
-    recentTickets: recentResult.data ?? [],
+    recentTickets: recentResult.data,
   };
 }
