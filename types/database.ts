@@ -53,5 +53,24 @@ export type ThreadAttachment = {
   file_size: number;
 };
 
+export type NotificationEventType = "new_ticket" | "client_reply";
+
+export type NotificationRow = {
+  id: string;
+  ticket_id: string | null;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type AdminNotification = {
+  id: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  ticket_number: string | null;
+};
+
+
 
 
