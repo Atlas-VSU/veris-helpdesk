@@ -8,7 +8,7 @@ import {
   OTP_RESEND_SECONDS,
 } from "@/lib/otp";
 import { sendOtpEmail } from "@/lib/otp-email";
-import { errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
+import { ApiError, errorResponse, handleApiError, parseJsonBody } from "@/lib/api-error";
 
 const SUCCESS_MESSAGE = "If this email has tickets, a code was sent.";
 
@@ -28,13 +28,15 @@ export async function POST(request: Request) {
     const supabase = getSupabaseServerClient();
 
     // 1. Resend wait. Works the same for every email.
-    const { data: latest } = await supabase
+    const { data: latest, error: lookupError } = await supabase
       .from("otp_verifications")
       .select("created_at")
       .eq("email", email)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (lookupError) throw ApiError.internal(undefined, { cause: lookupError });
 
     if (latest) {
       const secondsSince =
