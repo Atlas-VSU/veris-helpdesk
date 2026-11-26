@@ -104,6 +104,22 @@ const EXPECTED_RECENT_COLUMNS = [
   "created_at",
 ];
 
+function computeCountsRow(dataset) {
+  return {
+    total_tickets: dataset.length,
+    urgent_tickets: dataset.filter((row) => row.priority === "urgent").length,
+    new_count: dataset.filter((row) => row.status === "new").length,
+    open_count: dataset.filter((row) => row.status === "open").length,
+    in_progress_count: dataset.filter((row) => row.status === "in_progress")
+      .length,
+    waiting_for_client_count: dataset.filter(
+      (row) => row.status === "waiting_for_client",
+    ).length,
+    resolved_count: dataset.filter((row) => row.status === "resolved").length,
+    closed_count: dataset.filter((row) => row.status === "closed").length,
+  };
+}
+
 test("admin dashboard data module", async (t) => {
   const originalSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = "admin-dashboard-test-secret";
@@ -122,8 +138,7 @@ test("admin dashboard data module", async (t) => {
     token = adminToken,
     cookieName = "admin_session",
     dataset = KNOWN_TICKETS,
-    failWith = null,
-    failWhen = null,
+    respondWith = null,
   } = {}) {
     const calls = [];
     const client = createClient("https://database.example", "test-key", {
@@ -142,37 +157,19 @@ test("admin dashboard data module", async (t) => {
             headers,
           });
 
-          const shouldFail =
-            failWith && (typeof failWhen === "function" ? failWhen(parsedUrl, options) : true);
-          if (shouldFail) {
-            return new Response(JSON.stringify(failWith), {
-              status: 500,
+          if (typeof respondWith === "function") {
+            const customResponse = respondWith(parsedUrl, options);
+            if (customResponse) return customResponse;
+          }
+
+          if (parsedUrl.pathname === "/rest/v1/rpc/get_admin_dashboard_counts") {
+            return new Response(JSON.stringify([computeCountsRow(dataset)]), {
+              status: 200,
               headers: { "Content-Type": "application/json" },
             });
           }
 
           let rows = [...dataset];
-          const priorityFilter = parsedUrl.searchParams.get("priority");
-          if (priorityFilter?.startsWith("eq.")) {
-            const priority = priorityFilter.slice(3);
-            rows = rows.filter((row) => row.priority === priority);
-          }
-
-          const statusFilter = parsedUrl.searchParams.get("status");
-          if (statusFilter?.startsWith("eq.")) {
-            const status = statusFilter.slice(3);
-            rows = rows.filter((row) => row.status === status);
-          }
-
-          if (options.method === "HEAD") {
-            const range =
-              rows.length === 0 ? "*/0" : `0-${rows.length - 1}/${rows.length}`;
-            return new Response(null, {
-              status: 200,
-              headers: { "Content-Range": range },
-            });
-          }
-
           const order = parsedUrl.searchParams.get("order");
           if (order === "created_at.desc,id.desc") {
             rows.sort((a, b) => {
@@ -263,7 +260,7 @@ test("admin dashboard data module", async (t) => {
   );
 
   await t.test(
-    "returns exact total, urgent count, per-status counts, and bounded newest-first recent tickets",
+    "fetches all counts in one SQL RPC request and returns bounded newest-first recent tickets",
     async () => {
       const mod = setup();
       const data = await mod.getAdminDashboardData();
@@ -295,17 +292,19 @@ test("admin dashboard data module", async (t) => {
         assert.deepEqual(Object.keys(recent), EXPECTED_RECENT_COLUMNS);
       }
 
-      const headCalls = mod.calls.filter((call) => call.method === "HEAD");
-      assert.equal(headCalls.length, 8);
-      for (const call of headCalls) {
-        assert.ok(
-          call.headers.get("prefer")?.includes("count=exact"),
-          `Expected count=exact Prefer header on ${call.url.toString()}`,
-        );
-      }
+      assert.equal(mod.calls.length, 2);
 
-      const recentCall = mod.calls.find((call) => call.method === "GET");
+      const rpcCalls = mod.calls.filter(
+        (call) => call.url.pathname === "/rest/v1/rpc/get_admin_dashboard_counts",
+      );
+      assert.equal(rpcCalls.length, 1);
+      assert.equal(rpcCalls[0].method, "POST");
+
+      const recentCall = mod.calls.find(
+        (call) => call.url.pathname === "/rest/v1/tickets",
+      );
       assert.ok(recentCall, "Expected a GET request for recent tickets");
+      assert.equal(recentCall.method, "GET");
       assert.equal(
         recentCall.url.searchParams.get("select"),
         EXPECTED_RECENT_COLUMNS.join(","),
@@ -402,20 +401,101 @@ test("admin dashboard data module", async (t) => {
     },
   );
 
-  await t.test("propagates errors from any sub-query, including a single status query", async () => {
-    const allFail = setup({
-      failWith: { message: "Database unavailable", code: "500" },
+  await t.test(
+    "throws instead of defaulting to zero when a request returns 404 with an empty body",
+    async () => {
+      const missingCounts404 = setup({
+        respondWith: (url) =>
+          url.pathname === "/rest/v1/rpc/get_admin_dashboard_counts"
+            ? new Response(null, { status: 404 })
+            : null,
+      });
+      await assert.rejects(() => missingCounts404.getAdminDashboardData(), {
+        message: "Dashboard counts query returned an invalid or empty response",
+      });
+
+      const missingRecent404 = setup({
+        respondWith: (url) =>
+          url.pathname === "/rest/v1/tickets"
+            ? new Response(null, { status: 404 })
+            : null,
+      });
+      await assert.rejects(() => missingRecent404.getAdminDashboardData(), {
+        message: "Recent tickets query returned an invalid or empty response",
+      });
+    },
+  );
+
+  await t.test(
+    "throws when the counts RPC returns an empty array or missing count field",
+    async () => {
+      const emptyRpcRows = setup({
+        respondWith: (url) =>
+          url.pathname === "/rest/v1/rpc/get_admin_dashboard_counts"
+            ? new Response(JSON.stringify([]), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              })
+            : null,
+      });
+      await assert.rejects(() => emptyRpcRows.getAdminDashboardData(), {
+        message: "Dashboard counts query returned an invalid or empty response",
+      });
+
+      const missingOpenCount = setup({
+        respondWith: (url) =>
+          url.pathname === "/rest/v1/rpc/get_admin_dashboard_counts"
+            ? new Response(
+                JSON.stringify([
+                  { ...computeCountsRow(KNOWN_TICKETS), open_count: null },
+                ]),
+                {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                },
+              )
+            : null,
+      });
+      await assert.rejects(() => missingOpenCount.getAdminDashboardData(), {
+        message: "Missing or invalid dashboard count: open_count",
+      });
+    },
+  );
+
+  await t.test("propagates database errors from either query", async () => {
+    const rpcError = setup({
+      respondWith: (url) =>
+        url.pathname === "/rest/v1/rpc/get_admin_dashboard_counts"
+          ? new Response(
+              JSON.stringify({ message: "Counts RPC failed", code: "500" }),
+              {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+              },
+            )
+          : null,
     });
-    await assert.rejects(() => allFail.getAdminDashboardData(), {
-      message: "Database unavailable",
+    await assert.rejects(() => rpcError.getAdminDashboardData(), {
+      message: "Counts RPC failed",
     });
 
-    const singleStatusFail = setup({
-      failWith: { message: "Closed status count failed", code: "500" },
-      failWhen: (url) => url.searchParams.get("status") === "eq.closed",
+    const recentError = setup({
+      respondWith: (url) =>
+        url.pathname === "/rest/v1/tickets"
+          ? new Response(
+              JSON.stringify({
+                message: "Recent tickets query failed",
+                code: "500",
+              }),
+              {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+              },
+            )
+          : null,
     });
-    await assert.rejects(() => singleStatusFail.getAdminDashboardData(), {
-      message: "Closed status count failed",
+    await assert.rejects(() => recentError.getAdminDashboardData(), {
+      message: "Recent tickets query failed",
     });
   });
 });
