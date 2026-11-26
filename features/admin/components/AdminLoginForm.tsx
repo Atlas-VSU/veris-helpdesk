@@ -1,12 +1,22 @@
 "use client";
 
+import * as React from "react";
+import { useSyncExternalStore } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAdminLogin } from "@/features/admin/hooks/use-admin-login";
 
+const emptySubscribe = () => () => {};
+
 export function AdminLoginForm() {
+  const isHydrated = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+
   const {
     email,
     setEmail,
@@ -19,9 +29,12 @@ export function AdminLoginForm() {
     handleSubmit,
   } = useAdminLogin();
 
+  const isButtonDisabled = !isHydrated || isSubmitting;
+
   return (
     <form
       noValidate
+      method="post"
       onSubmit={handleSubmit}
       aria-label="Admin sign in"
       aria-busy={isSubmitting}
@@ -81,8 +94,8 @@ export function AdminLoginForm() {
 
       <Button
         type="submit"
-        disabled={isSubmitting}
-        className="mt-6 min-h-11 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+        disabled={isButtonDisabled}
+        className="mt-6 min-h-11 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
       >
         {isSubmitting ? (
           <>
