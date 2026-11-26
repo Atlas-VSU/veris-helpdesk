@@ -8,28 +8,34 @@ const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]);
 
 const TICKET_ID = "00000000-0000-4000-8000-000000000001";
+const OTHER_TICKET_ID = "00000000-0000-4000-8000-000000000002";
+const ADMIN_ID = "00000000-0000-4000-8000-000000000010";
 const MESSAGE_ID = "17151769-2598-45ec-99f5-141279c288a1";
 const ATTACHMENT_ID = "3e2f70f2-be91-4f09-8281-f06d24922e9c";
 
-test("FS-09 admin reply attachment validation, persistence, and failure rollback", async (t) => {
+test("FS-09 admin reply attachment validation, atomic persistence, and failure rollback", async (t) => {
   t.mock.method(console, "error", () => {});
 
   function setup({
     uploadError = null,
     metadataError = null,
+    deleteMessageError = null,
+    initialMessages = [],
   } = {}) {
+    let currentUploadError = uploadError;
+    let currentMetadataError = metadataError;
     const operations = [];
     const uploadedObjects = [];
+    const savedMessages = initialMessages.map((msg) => ({ ...msg }));
     const savedAttachments = [];
-    const deletedMessages = [];
 
     const supabase = {
       storage: {
         from: (bucket) => ({
           upload: async (storagePath, file, options) => {
             operations.push({ type: "upload", bucket, storagePath, fileName: file.name, options });
-            if (uploadError) {
-              return { data: null, error: uploadError };
+            if (currentUploadError) {
+              return { data: null, error: currentUploadError };
             }
             uploadedObjects.push(storagePath);
             return { data: { path: storagePath }, error: null };
@@ -44,15 +50,109 @@ test("FS-09 admin reply attachment validation, persistence, and failure rollback
           },
         }),
       },
+      rpc: async (fnName, params) => {
+        if (fnName !== "create_admin_reply_with_attachment") {
+          throw new Error(`Unexpected RPC: ${fnName}`);
+        }
+        operations.push({ type: "rpc_create_admin_reply_with_attachment", params });
+
+        // Simulate atomic PostgreSQL transaction: if attachment metadata persistence fails,
+        // neither the message row nor the attachment row is committed.
+        if (currentMetadataError) {
+          return { data: null, error: currentMetadataError };
+        }
+
+        const messageRecord = {
+          id: params.p_message_id,
+          ticket_id: params.p_ticket_id,
+          sender_type: "admin",
+          admin_id: params.p_admin_id ?? null,
+          body: params.p_body,
+          created_at: "2026-11-26T04:00:00Z",
+        };
+        savedMessages.push(messageRecord);
+
+        const attachments = [];
+        if (params.p_storage_path !== null && params.p_storage_path !== undefined) {
+          const attachmentRecord = {
+            id: ATTACHMENT_ID,
+            ticket_id: messageRecord.ticket_id,
+            message_id: messageRecord.id,
+            file_name: params.p_file_name,
+            file_type: params.p_file_type,
+            file_size: params.p_file_size,
+            storage_path: params.p_storage_path,
+          };
+          savedAttachments.push(attachmentRecord);
+          attachments.push({
+            id: attachmentRecord.id,
+            message_id: attachmentRecord.message_id,
+            file_name: attachmentRecord.file_name,
+            file_type: attachmentRecord.file_type,
+            file_size: attachmentRecord.file_size,
+          });
+        }
+
+        return {
+          data: {
+            id: messageRecord.id,
+            ticket_id: messageRecord.ticket_id,
+            sender_type: messageRecord.sender_type,
+            body: messageRecord.body,
+            created_at: messageRecord.created_at,
+            attachments,
+          },
+          error: null,
+        };
+      },
       from: (table) => {
+        if (table === "messages") {
+          return {
+            select: (columns) => ({
+              eq: (col, val) => ({
+                maybeSingle: async () => {
+                  operations.push({ type: "select_message", columns, filters: { [col]: val } });
+                  const found = savedMessages.find((item) => item[col] === val) ?? null;
+                  return { data: found, error: null };
+                },
+              }),
+            }),
+            delete: () => ({
+              eq: (col1, val1) => ({
+                eq: async (col2, val2) => {
+                  operations.push({
+                    type: "delete_message",
+                    filters: { [col1]: val1, [col2]: val2 },
+                  });
+                  if (deleteMessageError) {
+                    return { error: deleteMessageError };
+                  }
+                  const idx = savedMessages.findIndex(
+                    (item) => item[col1] === val1 && item[col2] === val2,
+                  );
+                  if (idx !== -1) savedMessages.splice(idx, 1);
+                  return { error: null };
+                },
+              }),
+            }),
+          };
+        }
+
         if (table === "attachments") {
           return {
             insert: (payload) => ({
               select: (columns) => ({
                 single: async () => {
                   operations.push({ type: "insert_attachment", payload, columns });
-                  if (metadataError) {
-                    return { data: null, error: metadataError };
+                  if (currentMetadataError) {
+                    return { data: null, error: currentMetadataError };
+                  }
+                  const linkedMessage = savedMessages.find((msg) => msg.id === payload.message_id);
+                  if (!linkedMessage || linkedMessage.ticket_id !== payload.ticket_id) {
+                    return {
+                      data: null,
+                      error: new Error("attachments_message_ticket_fkey violation"),
+                    };
                   }
                   const record = {
                     id: ATTACHMENT_ID,
@@ -61,25 +161,12 @@ test("FS-09 admin reply attachment validation, persistence, and failure rollback
                     file_type: payload.file_type,
                     file_size: payload.file_size,
                   };
-                  savedAttachments.push({ ...record, ticket_id: payload.ticket_id, storage_path: payload.storage_path });
-                  return { data: record, error: null };
-                },
-              }),
-            }),
-          };
-        }
-
-        if (table === "messages") {
-          return {
-            delete: () => ({
-              eq: (col1, val1) => ({
-                eq: async (col2, val2) => {
-                  operations.push({
-                    type: "delete_message",
-                    filters: { [col1]: val1, [col2]: val2 },
+                  savedAttachments.push({
+                    ...record,
+                    ticket_id: payload.ticket_id,
+                    storage_path: payload.storage_path,
                   });
-                  deletedMessages.push({ [col1]: val1, [col2]: val2 });
-                  return { error: null };
+                  return { data: record, error: null };
                 },
               }),
             }),
@@ -100,12 +187,18 @@ test("FS-09 admin reply attachment validation, persistence, and failure rollback
       ...replyAttachments,
       operations,
       uploadedObjects,
+      savedMessages,
       savedAttachments,
-      deletedMessages,
+      setUploadError: (err) => {
+        currentUploadError = err;
+      },
+      setMetadataError: (err) => {
+        currentMetadataError = err;
+      },
     };
   }
 
-  await t.test("persists valid JPG, PNG, and PDF files and links them via ticket_id and message_id", async () => {
+  await t.test("uploads file first, then atomically saves the reply and attachment metadata", async () => {
     const validFiles = [
       new File([JPEG_BYTES], "receipt photo.jpg", { type: "image/jpeg" }),
       new File([PNG_BYTES], "screenshot.png", { type: "image/png" }),
@@ -114,30 +207,69 @@ test("FS-09 admin reply attachment validation, persistence, and failure rollback
 
     for (const file of validFiles) {
       const ctx = setup();
-      const result = await ctx.persistAdminReplyAttachment({
+      const savedReply = await ctx.persistAdminReplyWithAttachment({
         ticketId: TICKET_ID,
+        adminId: ADMIN_ID,
         messageId: MESSAGE_ID,
+        body: "  I've attached the refund confirmation.  ",
         file,
       });
 
-      assert.deepEqual(result, {
-        id: ATTACHMENT_ID,
-        message_id: MESSAGE_ID,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
+      assert.deepEqual(savedReply, {
+        id: MESSAGE_ID,
+        sender_type: "admin",
+        body: "I've attached the refund confirmation.",
+        created_at: "2026-11-26T04:00:00Z",
+        attachments: [
+          {
+            id: ATTACHMENT_ID,
+            message_id: MESSAGE_ID,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+          },
+        ],
       });
+
+      assert.deepEqual(
+        ctx.operations.map((op) => op.type),
+        ["upload", "rpc_create_admin_reply_with_attachment"],
+      );
       assert.equal(ctx.uploadedObjects.length, 1);
       assert.ok(ctx.uploadedObjects[0].startsWith(`${TICKET_ID}/${MESSAGE_ID}/`));
+      assert.equal(ctx.savedMessages.length, 1);
+      assert.equal(ctx.savedMessages[0].id, MESSAGE_ID);
+      assert.equal(ctx.savedMessages[0].ticket_id, TICKET_ID);
       assert.equal(ctx.savedAttachments.length, 1);
       assert.equal(ctx.savedAttachments[0].ticket_id, TICKET_ID);
       assert.equal(ctx.savedAttachments[0].message_id, MESSAGE_ID);
       assert.equal(ctx.savedAttachments[0].storage_path, ctx.uploadedObjects[0]);
-      assert.equal(ctx.deletedMessages.length, 0);
     }
   });
 
-  await t.test("rejects empty, oversized, unsupported MIME, and spoofed signature files without uploading", async () => {
+  await t.test("saves text-only admin reply with an empty attachments array when no file is provided", async () => {
+    const ctx = setup();
+    const savedReply = await ctx.persistAdminReplyWithAttachment({
+      ticketId: TICKET_ID,
+      adminId: ADMIN_ID,
+      messageId: MESSAGE_ID,
+      body: "Could you confirm the statement date?",
+      file: null,
+    });
+
+    assert.deepEqual(savedReply, {
+      id: MESSAGE_ID,
+      sender_type: "admin",
+      body: "Could you confirm the statement date?",
+      created_at: "2026-11-26T04:00:00Z",
+      attachments: [],
+    });
+    assert.equal(ctx.uploadedObjects.length, 0);
+    assert.equal(ctx.savedMessages.length, 1);
+    assert.equal(ctx.savedAttachments.length, 0);
+  });
+
+  await t.test("rejects empty, oversized, unsupported MIME, and spoofed signature files without uploading or creating a reply", async () => {
     const { MAX_ATTACHMENT_SIZE_BYTES } = loadTs("features/submit-ticket/attachment-validation.ts");
     const invalidFiles = [
       [
@@ -170,67 +302,153 @@ test("FS-09 admin reply attachment validation, persistence, and failure rollback
       const ctx = setup();
       await assert.rejects(
         () =>
-          ctx.persistAdminReplyAttachment({
+          ctx.persistAdminReplyWithAttachment({
             ticketId: TICKET_ID,
             messageId: MESSAGE_ID,
+            body: "Here is the file.",
             file,
           }),
         (err) => err.status === 400 && err.message === expectedMessage,
       );
       assert.equal(ctx.operations.length, 0);
       assert.equal(ctx.uploadedObjects.length, 0);
+      assert.equal(ctx.savedMessages.length, 0);
       assert.equal(ctx.savedAttachments.length, 0);
     }
   });
 
-  await t.test("simulated storage upload failure rolls back the partial reply message and leaves no attachment", async () => {
-    const ctx = setup({ uploadError: new Error("Storage bucket unreachable") });
+  await t.test("regression: failed upload leaves no visible reply in the thread even if message delete would also fail, preventing duplicate replies on retry", async () => {
+    const ctx = setup({
+      uploadError: new Error("Storage bucket unreachable"),
+      deleteMessageError: new Error("Cleanup delete also failed"),
+    });
     const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
-    let callbackCalled = false;
 
     await assert.rejects(
       () =>
-        ctx.persistAdminReplyAttachment({
+        ctx.persistAdminReplyWithAttachment({
           ticketId: TICKET_ID,
+          adminId: ADMIN_ID,
           messageId: MESSAGE_ID,
+          body: "I've attached the refund confirmation.",
           file,
-          onRollback: () => {
-            callbackCalled = true;
-          },
         }),
       (err) => err.status === 500 && err.message === "Failed to upload attachment. Please try again.",
     );
 
+    // Because upload happens before database persistence, the reply was never inserted.
     assert.equal(ctx.uploadedObjects.length, 0);
+    assert.equal(ctx.savedMessages.length, 0);
     assert.equal(ctx.savedAttachments.length, 0);
-    assert.deepEqual(ctx.deletedMessages, [{ id: MESSAGE_ID, ticket_id: TICKET_ID }]);
-    assert.equal(callbackCalled, true);
+
+    // When the admin retries after storage recovers, the reply appears once in the thread.
+    ctx.setUploadError(null);
+    const retryReply = await ctx.persistAdminReplyWithAttachment({
+      ticketId: TICKET_ID,
+      adminId: ADMIN_ID,
+      messageId: MESSAGE_ID,
+      body: "I've attached the refund confirmation.",
+      file,
+    });
+
+    assert.equal(retryReply.id, MESSAGE_ID);
+    assert.equal(ctx.savedMessages.length, 1);
+    assert.equal(ctx.savedAttachments.length, 1);
   });
 
-  await t.test("simulated metadata insert failure removes uploaded object and rolls back the partial reply", async () => {
-    const ctx = setup({ metadataError: new Error("Foreign key violation") });
+  await t.test("regression: simulated transaction/metadata save failure leaves no partial reply in the thread and removes the uploaded file", async () => {
+    const ctx = setup({ metadataError: new Error("Transaction rolled back") });
     const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
 
     await assert.rejects(
       () =>
-        ctx.persistAdminReplyAttachment({
+        ctx.persistAdminReplyWithAttachment({
           ticketId: TICKET_ID,
+          adminId: ADMIN_ID,
           messageId: MESSAGE_ID,
+          body: "I've attached the refund confirmation.",
           file,
         }),
       (err) => err.status === 500 && err.message === "Failed to save attachment info. Please try again.",
     );
 
     assert.equal(ctx.uploadedObjects.length, 0);
+    assert.equal(ctx.savedMessages.length, 0);
     assert.equal(ctx.savedAttachments.length, 0);
     assert.deepEqual(
       ctx.operations.map((op) => op.type),
-      ["upload", "insert_attachment", "remove", "delete_message"],
+      ["upload", "rpc_create_admin_reply_with_attachment", "remove"],
     );
-    assert.deepEqual(ctx.deletedMessages, [{ id: MESSAGE_ID, ticket_id: TICKET_ID }]);
   });
 
-  await t.test("extractOptionalReplyAttachment handles missing, empty input, valid File, and invalid string entries", () => {
+  await t.test("verifies the reply belongs to the ticket and derives ticket_id from the saved reply before saving attachment", async () => {
+    const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
+
+    // 1. Rejects when the message belongs to a different ticket
+    const mismatchCtx = setup({
+      initialMessages: [
+        {
+          id: MESSAGE_ID,
+          ticket_id: OTHER_TICKET_ID,
+          sender_type: "admin",
+          body: "Reply on another ticket",
+          created_at: "2026-11-26T04:00:00Z",
+        },
+      ],
+    });
+
+    await assert.rejects(
+      () =>
+        mismatchCtx.persistAdminReplyAttachment({
+          ticketId: TICKET_ID,
+          messageId: MESSAGE_ID,
+          file,
+        }),
+      (err) =>
+        err.status === 400 &&
+        err.message === "Reply message does not belong to the specified ticket.",
+    );
+    assert.equal(mismatchCtx.uploadedObjects.length, 0);
+    assert.equal(mismatchCtx.savedAttachments.length, 0);
+
+    // 2. Rejects when the message does not exist
+    const missingCtx = setup({ initialMessages: [] });
+    await assert.rejects(
+      () =>
+        missingCtx.persistAdminReplyAttachment({
+          ticketId: TICKET_ID,
+          messageId: MESSAGE_ID,
+          file,
+        }),
+      (err) => err.status === 400 && err.message === "Reply message not found.",
+    );
+    assert.equal(missingCtx.uploadedObjects.length, 0);
+    assert.equal(missingCtx.savedAttachments.length, 0);
+
+    // 3. Derives ticket_id directly from the saved reply when ticketId is omitted or matches
+    const matchCtx = setup({
+      initialMessages: [
+        {
+          id: MESSAGE_ID,
+          ticket_id: TICKET_ID,
+          sender_type: "admin",
+          body: "Reply on matching ticket",
+          created_at: "2026-11-26T04:00:00Z",
+        },
+      ],
+    });
+
+    const savedAttachment = await matchCtx.persistAdminReplyAttachment({
+      messageId: MESSAGE_ID,
+      file,
+    });
+    assert.equal(savedAttachment.id, ATTACHMENT_ID);
+    assert.equal(savedAttachment.message_id, MESSAGE_ID);
+    assert.equal(matchCtx.savedAttachments.length, 1);
+    assert.equal(matchCtx.savedAttachments[0].ticket_id, TICKET_ID);
+  });
+
+  await t.test("extractOptionalReplyAttachment handles missing, empty input, valid File, invalid string, and rejects multiple attachment fields", () => {
     const ctx = setup();
 
     const emptyForm = new FormData();
@@ -250,6 +468,20 @@ test("FS-09 admin reply attachment validation, persistence, and failure rollback
     assert.throws(
       () => ctx.extractOptionalReplyAttachment(invalidStringForm),
       (err) => err.status === 400 && err.message === "Please upload a JPG, PNG, or PDF file.",
+    );
+
+    const multipleAttachmentsForm = new FormData();
+    multipleAttachmentsForm.append(
+      "attachment",
+      new File([PDF_BYTES], "first.pdf", { type: "application/pdf" }),
+    );
+    multipleAttachmentsForm.append(
+      "attachment",
+      new File([PNG_BYTES], "second.png", { type: "image/png" }),
+    );
+    assert.throws(
+      () => ctx.extractOptionalReplyAttachment(multipleAttachmentsForm),
+      (err) => err.status === 400 && err.message === "Only one attachment is allowed.",
     );
   });
 });

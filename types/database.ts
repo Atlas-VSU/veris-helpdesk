@@ -53,6 +53,14 @@ export type ThreadAttachment = {
   file_size: number;
 };
 
+export type SavedAdminReply = {
+  id: string;
+  sender_type: "admin";
+  body: string;
+  created_at: string;
+  attachments: ThreadAttachment[];
+};
+
 export type NotificationEventType = "new_ticket" | "client_reply";
 
 export type NotificationRow = {
