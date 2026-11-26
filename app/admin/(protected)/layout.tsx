@@ -3,6 +3,7 @@
 */
 
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { AdminMobileHeader } from "@/features/admin/components/AdminMobileHeader";
 import { getAdminSession } from "@/lib/admin-auth";
 import { redirect } from "next/navigation";
 
@@ -12,7 +13,8 @@ export default async function ProtectedAdminLayout({
   if (!(await getAdminSession())) redirect("/admin/login");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen flex-col md:flex-row overflow-hidden bg-background">
+      <AdminMobileHeader />
       <AdminSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
     </div>
