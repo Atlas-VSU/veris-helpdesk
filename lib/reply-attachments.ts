@@ -132,13 +132,17 @@ type SavedReplyLookupResult =
   | { status: "not_found" }
   | { status: "unconfirmed" };
 
-const UNCONFIRMED_TRANSPORT_ERROR_PATTERN =
-  /\b(lost|timeout|timed\s*out|network|fetch\s+failed|econnreset|etimedout|socket|hang\s+up|disconnected|connection\s+(?:reset|closed|lost|dropped|refused)|in[- ]?flight|still\s+saving|still\s+in\s+progress|response\s+lost|gateway|unavailable)\b/i;
+const UNCONFIRMED_OUTCOME_ERROR_PATTERN =
+  /\b(40003|08007|statement_completion_unknown|transaction_resolution_unknown|completion\s+unknown|resolution\s+unknown|outcome\s+(?:is\s+)?unknown|unknown\s+(?:outcome|resolution|completion)|lost|timeout|timed\s*out|network|fetch\s+failed|econnreset|etimedout|epipe|socket|hang\s+up|disconnected|connection\s+(?:reset|closed|lost|dropped|refused|exception|failure)|in[- ]?flight|still\s+saving|still\s+in\s+progress|response\s+lost|gateway|unavailable)\b/i;
 
 const CONFIRMED_ROLLBACK_ERROR_PATTERN =
   /\b(rolled\s*back|rollback|transaction\s+(?:failed|aborted|rolled\s*back)|attachment\s+metadata\s+is\s+incomplete|violates\s+(?:foreign\s+key|unique|check|not-null)\s+constraint|duplicate\s+key|null\s+value\s+in\s+column|invalid\s+input\s+syntax)\b/i;
 
-const POSTGRES_SQLSTATE_CODE_PATTERN = /^[0-9A-Z]{5}$/;
+// Only SQLSTATE codes that confirm PostgreSQL aborted and rolled back the transaction.
+// Excludes 40003 (statement_completion_unknown) and all Class 08 connection exceptions
+// including 08007 (transaction_resolution_unknown), where the save outcome is unknown.
+const CONFIRMED_ROLLBACK_SQLSTATE_PATTERN =
+  /^(?:22[0-9A-Z]{3}|23[0-9A-Z]{3}|25006|25P02|40000|40001|40002|40P01|42[0-9A-Z]{3}|53[0-4]00|54[0-9A-Z]{3}|57014|P000[1-4])$/i;
 
 export function isConfirmedTransactionRollback(error: unknown): boolean {
   if (!error || typeof error !== "object") {
@@ -166,15 +170,19 @@ export function isConfirmedTransactionRollback(error: unknown): boolean {
     return false;
   }
 
-  const code = typeof candidate.code === "string" ? candidate.code.trim() : "";
+  const code = typeof candidate.code === "string" ? candidate.code.trim().toUpperCase() : "";
   const message = typeof candidate.message === "string" ? candidate.message : "";
 
-  if (UNCONFIRMED_TRANSPORT_ERROR_PATTERN.test(message) || UNCONFIRMED_TRANSPORT_ERROR_PATTERN.test(code)) {
+  if (code === "40003" || code === "08007" || /^08[0-9A-Z]{3}$/.test(code)) {
     return false;
   }
 
-  if (code && POSTGRES_SQLSTATE_CODE_PATTERN.test(code)) {
-    return true;
+  if (UNCONFIRMED_OUTCOME_ERROR_PATTERN.test(message) || UNCONFIRMED_OUTCOME_ERROR_PATTERN.test(code)) {
+    return false;
+  }
+
+  if (code) {
+    return CONFIRMED_ROLLBACK_SQLSTATE_PATTERN.test(code);
   }
 
   return CONFIRMED_ROLLBACK_ERROR_PATTERN.test(message);
@@ -503,11 +511,38 @@ export async function persistAdminReplyAttachment({
 
   if (attachmentError || !attachment) {
     console.error("Error creating reply attachment record.");
-    const { error: removeError } = await supabase.storage
-      .from(ATTACHMENTS_BUCKET)
-      .remove([storagePath]);
-    if (removeError) {
-      console.error("Error removing uploaded reply attachment after metadata failure.");
+    const { data: rawAttachmentRow, error: attachmentLookupError } = await supabase
+      .from("attachments")
+      .select("id, message_id, file_name, file_type, file_size, storage_path")
+      .eq("message_id", replyRow.id)
+      .maybeSingle();
+
+    const savedAttachmentRow = rawAttachmentRow as SavedReplyAttachmentLookupRow | null;
+    if (
+      !attachmentLookupError &&
+      savedAttachmentRow &&
+      (!savedAttachmentRow.storage_path || savedAttachmentRow.storage_path === storagePath)
+    ) {
+      return {
+        id: savedAttachmentRow.id,
+        message_id: savedAttachmentRow.message_id ?? replyRow.id,
+        file_name: savedAttachmentRow.file_name,
+        file_type: savedAttachmentRow.file_type,
+        file_size: savedAttachmentRow.file_size,
+      };
+    }
+
+    if (
+      !attachmentLookupError &&
+      !savedAttachmentRow &&
+      isConfirmedTransactionRollback(attachmentError)
+    ) {
+      const { error: removeError } = await supabase.storage
+        .from(ATTACHMENTS_BUCKET)
+        .remove([storagePath]);
+      if (removeError) {
+        console.error("Error removing uploaded reply attachment after metadata failure.");
+      }
     }
 
     throw ApiError.internal("Failed to save attachment info. Please try again.", {

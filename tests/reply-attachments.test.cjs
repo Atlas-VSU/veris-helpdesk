@@ -462,34 +462,80 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
     );
   });
 
-  await t.test("regression: does not delete uploaded file when the database is still saving during the lookup and the save finishes after the lookup", async () => {
-    const ctx = setup({
-      finishSaveAfterLookupError: new Error("RPC timed out while database was still saving"),
-    });
-    const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
+  await t.test("regression: does not delete uploaded file when the database is still saving during the lookup and the save finishes after the lookup (including unknown-outcome codes 40003 and 08007)", async () => {
+    const unknownOutcomeErrors = [
+      new Error("RPC timed out while database was still saving"),
+      Object.assign(new Error("statement_completion_unknown"), { code: "40003" }),
+      Object.assign(new Error("transaction_resolution_unknown"), { code: "08007" }),
+    ];
 
-    await assert.rejects(
-      () =>
-        ctx.persistAdminReplyWithAttachment({
-          ticketId: TICKET_ID,
-          adminId: ADMIN_ID,
-          messageId: MESSAGE_ID,
-          body: "I've attached the refund confirmation.",
-          file,
-        }),
-      (err) => err.status === 500 && err.message === "Failed to save attachment info. Please try again.",
-    );
+    for (const unknownError of unknownOutcomeErrors) {
+      const ctx = setup({
+        finishSaveAfterLookupError: unknownError,
+      });
+      const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
 
-    // The save completed after the lookup returned an empty result, and the file it references is preserved.
-    assert.equal(ctx.savedMessages.length, 1);
-    assert.equal(ctx.savedMessages[0].id, MESSAGE_ID);
-    assert.equal(ctx.savedAttachments.length, 1);
-    assert.equal(ctx.uploadedObjects.length, 1);
-    assert.equal(ctx.uploadedObjects[0], ctx.savedAttachments[0].storage_path);
-    assert.deepEqual(
-      ctx.operations.map((op) => op.type),
-      ["upload", "rpc_create_admin_reply_with_attachment", "select_message"],
-    );
+      assert.equal(ctx.isConfirmedTransactionRollback(unknownError), false);
+
+      await assert.rejects(
+        () =>
+          ctx.persistAdminReplyWithAttachment({
+            ticketId: TICKET_ID,
+            adminId: ADMIN_ID,
+            messageId: MESSAGE_ID,
+            body: "I've attached the refund confirmation.",
+            file,
+          }),
+        (err) =>
+          err.status === 500 &&
+          err.message === "Failed to save attachment info. Please try again.",
+      );
+
+      // The save completed after the lookup returned an empty result, and the file it references is preserved.
+      assert.equal(ctx.savedMessages.length, 1);
+      assert.equal(ctx.savedMessages[0].id, MESSAGE_ID);
+      assert.equal(ctx.savedAttachments.length, 1);
+      assert.equal(ctx.uploadedObjects.length, 1);
+      assert.equal(ctx.uploadedObjects[0], ctx.savedAttachments[0].storage_path);
+      assert.deepEqual(
+        ctx.operations.map((op) => op.type),
+        ["upload", "rpc_create_admin_reply_with_attachment", "select_message"],
+      );
+    }
+
+    for (const code of ["40003", "08007"]) {
+      const unknownSqlStateError = Object.assign(
+        new Error(`Transaction rollback outcome unknown (${code})`),
+        { code },
+      );
+      const ctx = setup({
+        metadataError: unknownSqlStateError,
+      });
+      const file = new File([PDF_BYTES], "refund-confirmation.pdf", { type: "application/pdf" });
+
+      assert.equal(ctx.isConfirmedTransactionRollback(unknownSqlStateError), false);
+
+      await assert.rejects(
+        () =>
+          ctx.persistAdminReplyWithAttachment({
+            ticketId: TICKET_ID,
+            adminId: ADMIN_ID,
+            messageId: MESSAGE_ID,
+            body: "I've attached the refund confirmation.",
+            file,
+          }),
+        (err) =>
+          err.status === 500 &&
+          err.message === "Failed to save attachment info. Please try again.",
+      );
+
+      // Even when the lookup finds no row yet, 40003 and 08007 mean the save outcome is unknown, so the file is kept.
+      assert.equal(ctx.uploadedObjects.length, 1);
+      assert.deepEqual(
+        ctx.operations.map((op) => op.type),
+        ["upload", "rpc_create_admin_reply_with_attachment", "select_message"],
+      );
+    }
   });
 
   await t.test("verifies the reply belongs to the ticket and derives ticket_id from the saved reply before saving attachment", async () => {
