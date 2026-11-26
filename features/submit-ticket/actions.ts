@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { after } from "next/server";
+import { recordNewTicketNotification } from "@/lib/notifications";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { ticketSubmissionRateLimit } from "@/lib/rate-limit";
 import {
@@ -142,6 +143,12 @@ export async function submitTicketAction(formData: FormData): Promise<SubmitTick
       await supabase.from("tickets").delete().eq("id", ticketId);
       return { error: "Failed to save attachment info. Please try again." };
     }
+  }
+
+  try {
+    await recordNewTicketNotification({ ticketId, ticketNumber });
+  } catch {
+    console.error("Failed to record new ticket notification.");
   }
 
   const submitterEmail = ticketDataParsed.email;

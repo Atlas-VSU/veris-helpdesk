@@ -6,7 +6,7 @@ const { loadTs } = require("./helpers/load-ts.cjs");
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00]);
 const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]);
-const TICKET_ID = "ticket-id-1";
+const TICKET_ID = "64b58b26-e4d6-4729-8fb8-90cfecba4af8";
 const TICKET_NUMBER = "TCK-2026-00427";
 const SUBMITTER = "jane@example.com";
 const SHARED_MAILBOX = "helpdesk-admin@example.com";
@@ -174,7 +174,7 @@ test("ticket form draft storage", async (t) => {
   });
 });
 
-test("submitTicketAction validation, persistence, and email delivery", async (t) => {
+test("submitTicketAction validation, persistence, and notifications", async (t) => {
   setTestEnv(t, {
     GMAIL_USER: SMTP_SENDER,
     GMAIL_APP_PASSWORD: SMTP_PASSWORD,
@@ -188,11 +188,13 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
     rateLimitThrows = false,
     turnstileValid = true,
     failedSave,
+    failInboxWrite = false,
     failedRecipient,
   } = {}) {
     const rateLimitCalls = [];
     const operations = [];
     const afterCallbacks = [];
+    const inboxWrites = [];
     const { messages, modules } = mockGmail(failedRecipient);
     const saveError = (operation) =>
       failedSave === operation ? new Error(PRIVATE_FAILURE_DETAIL) : null;
@@ -209,6 +211,13 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
         after: (callback) => {
           operations.push("schedule emails");
           afterCallbacks.push(callback);
+        },
+      },
+      "@/lib/notifications": {
+        recordNewTicketNotification: async (ticket) => {
+          operations.push("write inbox notification");
+          inboxWrites.push(ticket);
+          if (failInboxWrite) throw new Error(PRIVATE_FAILURE_DETAIL);
         },
       },
       "@/lib/rate-limit": {
@@ -287,6 +296,7 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
     return {
       submitTicketAction,
       getStats: () => ({ rateLimitCalls, turnstileCalls, dbCalls }),
+      inboxWrites,
       messages,
       operations,
       afterCallbacks,
@@ -294,7 +304,7 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
   }
 
   await t.test("uses first IP from x-forwarded-for and returns rate-limit error without hitting Turnstile or DB", async () => {
-    const { submitTicketAction, getStats, afterCallbacks, messages } = loadAction({
+    const { submitTicketAction, getStats, inboxWrites, afterCallbacks, messages } = loadAction({
       forwardedFor: " 203.0.113.99 , 198.51.100.2 ",
       rateLimitResult: { success: false },
     });
@@ -306,12 +316,13 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
       turnstileCalls: 0,
       dbCalls: 0,
     });
+    assert.deepEqual(inboxWrites, []);
     assert.deepEqual(afterCallbacks, []);
     assert.deepEqual(messages, []);
   });
 
   await t.test("rejects named zero-byte attachment instead of silently skipping it", async () => {
-    const { submitTicketAction, getStats, afterCallbacks, messages } = loadAction();
+    const { submitTicketAction, getStats, inboxWrites, afterCallbacks, messages } = loadAction();
     const emptyAttachment = new File([], "empty.png", { type: "image/png" });
 
     const result = await submitTicketAction(createValidFormData(emptyAttachment));
@@ -319,6 +330,7 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
       error: "The selected file is empty. Please choose a valid JPG, PNG, or PDF file.",
     });
     assert.equal(getStats().dbCalls, 0);
+    assert.deepEqual(inboxWrites, []);
     assert.deepEqual(afterCallbacks, []);
     assert.deepEqual(messages, []);
   });
@@ -332,22 +344,23 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
     const result = await submitTicketAction(createValidFormData());
     assert.deepEqual(result, { success: true, ticketNumber: TICKET_NUMBER });
     assert.deepEqual(getStats().rateLimitCalls, ["127.0.0.1"]);
-    assert.deepEqual(operations, ["save ticket", "schedule emails"]);
+    assert.deepEqual(operations, ["save ticket", "write inbox notification", "schedule emails"]);
   });
 
   for (const withAttachment of [false, true]) {
-    await t.test(`sends both emails once after a successful submission ${withAttachment ? "with" : "without"} an attachment`, async () => {
-      const { submitTicketAction, operations, afterCallbacks, messages } = loadAction();
+    await t.test(`writes one inbox entry and sends both emails after saving a ticket ${withAttachment ? "with" : "without"} an attachment`, async () => {
+      const { submitTicketAction, inboxWrites, operations, afterCallbacks, messages } = loadAction();
       const attachment = withAttachment ? new File([PDF_BYTES], "invoice.pdf", { type: "application/pdf" }) : undefined;
 
       assert.deepEqual(await submitTicketAction(createValidFormData(attachment)), { success: true, ticketNumber: TICKET_NUMBER });
       assert.deepEqual(operations, withAttachment
-        ? ["save ticket", "upload attachment", "save attachment metadata", "schedule emails"]
-        : ["save ticket", "schedule emails"]);
+        ? ["save ticket", "upload attachment", "save attachment metadata", "write inbox notification", "schedule emails"]
+        : ["save ticket", "write inbox notification", "schedule emails"]);
       assert.equal(afterCallbacks.length, 1);
       assert.deepEqual(messages, []);
       await afterCallbacks[0]();
 
+      assert.deepEqual(inboxWrites, [{ ticketId: TICKET_ID, ticketNumber: TICKET_NUMBER }]);
       assert.deepEqual(messages.map((message) => message.to), [SUBMITTER, SHARED_MAILBOX]);
       for (const message of messages) {
         assert.ok(message.subject.includes(TICKET_NUMBER));
@@ -358,13 +371,14 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
     });
   }
 
-  await t.test("does not schedule email when fields or Turnstile are rejected", async () => {
+  await t.test("skips the inbox write and emails when fields or Turnstile are rejected", async () => {
     const invalidEmail = createValidFormData();
     invalidEmail.set("email", "invalid");
     const invalidTicket = loadAction();
     assert.deepEqual(await invalidTicket.submitTicketAction(invalidEmail), { error: "Invalid email address" });
     assert.equal(invalidTicket.getStats().turnstileCalls, 0);
     assert.deepEqual(invalidTicket.operations, []);
+    assert.deepEqual(invalidTicket.inboxWrites, []);
     assert.deepEqual(invalidTicket.afterCallbacks, []);
     assert.deepEqual(invalidTicket.messages, []);
 
@@ -373,6 +387,7 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
       error: "We could not verify the spam protection check. Please try again.", captchaError: true,
     });
     assert.deepEqual(invalidCaptcha.operations, []);
+    assert.deepEqual(invalidCaptcha.inboxWrites, []);
     assert.deepEqual(invalidCaptcha.afterCallbacks, []);
     assert.deepEqual(invalidCaptcha.messages, []);
   });
@@ -383,16 +398,34 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
     ["metadata", "Failed to save attachment info. Please try again.", ["save ticket", "upload attachment", "save attachment metadata", "remove attachment", "delete ticket"]],
   ];
   for (const [failedSave, error, expectedOperations] of saveFailures) {
-    await t.test(`does not schedule email after a ${failedSave} save failure`, async () => {
-      const { submitTicketAction, operations, afterCallbacks, messages } = loadAction({ failedSave });
+    await t.test(`skips the inbox write and emails after a ${failedSave} save failure`, async () => {
+      const { submitTicketAction, inboxWrites, operations, afterCallbacks, messages } = loadAction({ failedSave });
       const attachment = new File([PDF_BYTES], "invoice.pdf", { type: "application/pdf" });
 
       assert.deepEqual(await submitTicketAction(createValidFormData(attachment)), { error });
       assert.deepEqual(operations, expectedOperations);
+      assert.deepEqual(inboxWrites, []);
       assert.deepEqual(afterCallbacks, []);
       assert.deepEqual(messages, []);
     });
   }
+
+  await t.test("preserves success and attempts both emails when the inbox write fails", async () => {
+    errors.mock.resetCalls();
+    const { submitTicketAction, inboxWrites, operations, afterCallbacks, messages } = loadAction({ failInboxWrite: true });
+
+    assert.deepEqual(await submitTicketAction(createValidFormData()), { success: true, ticketNumber: TICKET_NUMBER });
+    assert.deepEqual(operations, ["save ticket", "write inbox notification", "schedule emails"]);
+    assert.equal(afterCallbacks.length, 1);
+    assert.deepEqual(messages, []);
+    await afterCallbacks[0]();
+
+    assert.deepEqual(inboxWrites, [{ ticketId: TICKET_ID, ticketNumber: TICKET_NUMBER }]);
+    assert.deepEqual(messages.map((message) => message.to), [SUBMITTER, SHARED_MAILBOX]);
+    assert.deepEqual(errors.mock.calls.map((call) => call.arguments), [
+      ["Failed to record new ticket notification."],
+    ]);
+  });
 
   const adminMailboxFailures = [
     ["missing", undefined, "ADMIN_NOTIFICATION_EMAIL is missing"],
