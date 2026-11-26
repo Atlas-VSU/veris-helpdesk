@@ -622,9 +622,8 @@ paths:
       summary: List entries in the shared admin inbox
       operationId: adminListNotifications
       description: >
-        Planned operation. Requires admin_session. Returns up to 50 entries,
-        ordered by created_at newest first. All admins see the same entries
-        and read state.
+        Requires admin_session. Returns up to 50 entries, ordered by created_at
+        newest first. All admins see the same entries and read state.
       security:
         - adminSession: []
       responses:
@@ -659,8 +658,8 @@ paths:
       summary: Mark a notification as read
       operationId: adminMarkNotificationRead
       description: >
-        Planned operation. Requires admin_session. Marks the entry as read
-        for all admins. Invalid notification IDs or request bodies return 400.
+        Requires admin_session. Marks the entry as read for all admins. Invalid
+        notification IDs or request bodies return 400.
       security:
         - adminSession: []
       requestBody:
@@ -707,8 +706,8 @@ paths:
       summary: Delete a notification
       operationId: adminDeleteNotification
       description: >
-        Planned operation. Requires admin_session. Removes the entry from the
-        shared inbox for all admins. Invalid notification IDs return 400.
+        Requires admin_session. Removes the entry from the shared inbox for all
+        admins. Invalid notification IDs return 400.
       security:
         - adminSession: []
       responses:
@@ -1208,7 +1207,7 @@ components:
                         type: string
     Notification:
       type: object
-      description: Planned shared admin inbox entry.
+      description: Shared admin inbox entry.
       required: [id, message, is_read, created_at, ticket_number]
       properties:
         id:
