@@ -455,9 +455,10 @@ paths:
       summary: Get a ticket and its conversation as an administrator
       operationId: adminGetTicket
       description: >
-        Planned operation. Requires admin_session and can retrieve any ticket.
-        Returns the same ticket and thread fields as client detail. Invalid
-        ticket numbers return 400.
+        Requires admin_session and can retrieve any ticket. Returns oldest-first
+        messages with IDs and attachment metadata with IDs. An attachment's
+        message_id identifies its reply, or is null for an original submission
+        file. Invalid ticket numbers return 400.
       security:
         - adminSession: []
       responses:
