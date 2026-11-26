@@ -240,6 +240,52 @@ test("admin ticket API contract and database requests", async (t) => {
     }
   });
 
+  await t.test("PATCH changes can be read back from detail, including close and reopen", async () => {
+    const api = setup();
+    let stored = { ...ticket };
+    api.reply.body = (call) => {
+      assert.equal(call.url.pathname, "/rest/v1/tickets");
+      assert.equal(call.url.searchParams.get("ticket_number"), `eq.${ticket.ticket_number}`);
+      if (call.method === "PATCH") {
+        stored = { ...stored, ...JSON.parse(call.body) };
+        return [stored];
+      }
+      return [{ ...stored, messages: [], attachments: [] }];
+    };
+
+    let expected = { ...ticket };
+    for (const change of [
+      { priority: "urgent" }, // Preserve the legacy service until an admin changes it.
+      { service: "Billing" },
+      { service: "Technical Support", status: "waiting_for_client", priority: "low" },
+      { service: "General Inquiry" },
+      { status: "closed" },
+      { status: "open" },
+    ]) {
+      expected = { ...expected, ...change };
+      const updated = await api.PATCH(patchRequest(change), context());
+      assert.equal(updated.status, 200);
+      assert.deepEqual(await updated.json(), { data: expected });
+
+      const detail = await api.getDetail(detailRequest(), context());
+      assert.equal(detail.status, 200);
+      assert.deepEqual(await detail.json(), { data: { ...expected, messages: [], attachments: [] } });
+    }
+  });
+
+  await t.test("PATCH rejects an unknown category, including when another field is valid", async () => {
+    const api = setup();
+    for (const change of [
+      { service: "Internet" }, { service: null }, { service: "" },
+      { status: "closed", service: "billing" }, { category: "Billing" },
+    ]) {
+      const response = await api.PATCH(patchRequest(change), context());
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { error: "Invalid ticket update" });
+    }
+    assert.equal(api.calls.length, 0);
+  });
+
   await t.test("PATCH rejects invalid JSON, ticket numbers, empty and unauthorized fields", async () => {
     const api = setup();
     for (const body of [{}, [], null, { status: "bad" }, { priority: "bad" }, { status: null }, { priority: null }, { email: "attacker@example.com" }, { status: "open", subject: "changed" }]) {

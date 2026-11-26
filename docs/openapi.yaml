@@ -476,10 +476,10 @@ paths:
       summary: Update a ticket's status, priority, or service
       operationId: adminUpdateTicket
       description: >
-        Requires admin_session. Changing the ticket's category through service
-        is planned. For the planned Reopen action, set `status` to `open` on a
-        `closed` ticket. For the planned Request info action, set `status` to
-        `waiting_for_client`. Send any explanatory message through
+        Requires admin_session. Change the ticket's category through `service`.
+        Set `status` to `closed` to close a ticket or to `open` to reopen it.
+        For the Request info action, set `status` to `waiting_for_client`.
+        Explanatory messages use the separately planned
         `POST /api/admin/tickets/{ticketNumber}/messages`.
       security:
         - adminSession: []
@@ -1163,7 +1163,7 @@ components:
         service:
           type: string
           enum: [Billing, Technical Support, General Inquiry]
-          description: Planned field for updating the ticket's existing service.
+          description: Updates the ticket's category using its existing service field.
     ReplyBody:
       type: string
       description: >

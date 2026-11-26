@@ -20,6 +20,7 @@ import type {
 } from "@/features/submit-ticket/types/types";
 import { FieldWithLabel, FileUploadField } from "@/features/submit-ticket/components/form-fields";
 import { TurnstileWidget } from "@/features/submit-ticket/components/turnstile-widget";
+import { SERVICE_OPTIONS } from "@/features/tickets/service-options";
 
 const MAX_SUBJECT_LENGTH = 200;
 
@@ -27,8 +28,6 @@ const USER_TYPE_OPTIONS: readonly UserTypeOption[] = [
   { value: "subscriber", label: "Subscriber" },
   { value: "student", label: "Student" },
 ];
-
-const SERVICE_OPTIONS = ["Billing", "Technical Support", "General Inquiry"] as const;
 
 const PRIORITY_OPTIONS: readonly PriorityOption[] = [
   {
