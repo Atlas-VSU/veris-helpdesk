@@ -1,14 +1,32 @@
 import "server-only";
 
 import { z } from "zod";
-import { sendGmailEmail } from "@/lib/gmail-smtp";
+import { GMAIL_CREDENTIALS_MISSING, GMAIL_DELIVERY_FAILED, sendGmailEmail } from "@/lib/gmail-smtp";
 
 const adminEmailSchema = z.email();
+const ADMIN_EMAIL_MISSING = "ADMIN_NOTIFICATION_EMAIL is missing";
+const ADMIN_EMAIL_INVALID = "ADMIN_NOTIFICATION_EMAIL must contain one email address";
+const safeFailureReasons = [
+  ADMIN_EMAIL_MISSING,
+  ADMIN_EMAIL_INVALID,
+  GMAIL_CREDENTIALS_MISSING,
+  GMAIL_DELIVERY_FAILED,
+];
+
+export function getTicketEmailFailureReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : undefined;
+  return safeFailureReasons.find((reason) => reason === message) ?? "Unexpected email error";
+}
 
 function getAdminNotificationEmail(): string {
-  const recipient = adminEmailSchema.safeParse(process.env.ADMIN_NOTIFICATION_EMAIL?.trim());
+  const configuredEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim();
+  if (!configuredEmail) {
+    throw new Error(ADMIN_EMAIL_MISSING);
+  }
+
+  const recipient = adminEmailSchema.safeParse(configuredEmail);
   if (!recipient.success) {
-    throw new Error("ADMIN_NOTIFICATION_EMAIL must contain one email address");
+    throw new Error(ADMIN_EMAIL_INVALID);
   }
   return recipient.data;
 }

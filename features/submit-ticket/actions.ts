@@ -4,7 +4,11 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { ticketSubmissionRateLimit } from "@/lib/rate-limit";
-import { sendNewTicketAdminAlert, sendTicketSubmissionConfirmation } from "@/lib/ticket-email";
+import {
+  getTicketEmailFailureReason,
+  sendNewTicketAdminAlert,
+  sendTicketSubmissionConfirmation,
+} from "@/lib/ticket-email";
 import { createTicketSchema } from "@/features/tickets/schemas/ticket";
 import {
   hasAcceptedAttachmentSignature,
@@ -143,11 +147,11 @@ export async function submitTicketAction(formData: FormData): Promise<SubmitTick
   const submitterEmail = ticketDataParsed.email;
   after(async () => {
     await Promise.all([
-      sendTicketSubmissionConfirmation(submitterEmail, ticketNumber).catch(() => {
-        console.error("Failed to send ticket submission confirmation.");
+      sendTicketSubmissionConfirmation(submitterEmail, ticketNumber).catch((error: unknown) => {
+        console.error("Failed to send ticket submission confirmation.", getTicketEmailFailureReason(error));
       }),
-      sendNewTicketAdminAlert(ticketNumber).catch(() => {
-        console.error("Failed to send new ticket admin alert.");
+      sendNewTicketAdminAlert(ticketNumber).catch((error: unknown) => {
+        console.error("Failed to send new ticket admin alert.", getTicketEmailFailureReason(error));
       }),
     ]);
   });

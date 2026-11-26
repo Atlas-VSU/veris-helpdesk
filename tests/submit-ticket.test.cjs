@@ -17,7 +17,8 @@ const PRIVATE_FAILURE_DETAIL = "raw failure with mock-app-password and private t
 function setTestEnv(t, values) {
   for (const [name, value] of Object.entries(values)) {
     const previous = process.env[name];
-    process.env[name] = value;
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
     t.after(() => {
       if (previous === undefined) delete process.env[name];
       else process.env[name] = previous;
@@ -393,15 +394,61 @@ test("submitTicketAction validation, persistence, and email delivery", async (t)
     });
   }
 
-  await t.test("preserves success and attempts the admin email when confirmation SMTP fails", async () => {
+  const adminMailboxFailures = [
+    ["missing", undefined, "ADMIN_NOTIFICATION_EMAIL is missing"],
+    ["invalid", `${SHARED_MAILBOX}, another@example.com`, "ADMIN_NOTIFICATION_EMAIL must contain one email address"],
+  ];
+  for (const [state, mailbox, reason] of adminMailboxFailures) {
+    await t.test(`preserves success and sends the confirmation when the admin mailbox is ${state}`, async (t) => {
+      setTestEnv(t, { ADMIN_NOTIFICATION_EMAIL: mailbox });
+      errors.mock.resetCalls();
+      const { submitTicketAction, afterCallbacks, messages } = loadAction();
+
+      assert.deepEqual(await submitTicketAction(createValidFormData()), { success: true, ticketNumber: TICKET_NUMBER });
+      assert.equal(afterCallbacks.length, 1);
+      assert.deepEqual(messages, []);
+      await afterCallbacks[0]();
+      assert.deepEqual(messages.map((message) => message.to), [SUBMITTER]);
+      assert.deepEqual(errors.mock.calls.map((call) => call.arguments), [
+        ["Failed to send new ticket admin alert.", reason],
+      ]);
+    });
+  }
+
+  const smtpFailures = [
+    [SUBMITTER, "ticket submission confirmation"],
+    [SHARED_MAILBOX, "new ticket admin alert"],
+  ];
+  for (const [failedRecipient, email] of smtpFailures) {
+    await t.test(`preserves success and attempts both emails when SMTP fails for the ${email}`, async () => {
+      errors.mock.resetCalls();
+      const { submitTicketAction, afterCallbacks, messages } = loadAction({ failedRecipient });
+      const attachment = new File([PDF_BYTES], "invoice.pdf", { type: "application/pdf" });
+
+      assert.deepEqual(await submitTicketAction(createValidFormData(attachment)), { success: true, ticketNumber: TICKET_NUMBER });
+      assert.equal(afterCallbacks.length, 1);
+      assert.deepEqual(messages, []);
+      await afterCallbacks[0]();
+      assert.deepEqual(messages.map((message) => message.to), [SUBMITTER, SHARED_MAILBOX]);
+      assert.deepEqual(errors.mock.calls.map((call) => call.arguments), [
+        [`Failed to send ${email}.`, "Gmail SMTP delivery failed"],
+      ]);
+    });
+  }
+
+  await t.test("preserves success and reports missing Gmail credentials for both emails", async (t) => {
+    setTestEnv(t, { GMAIL_APP_PASSWORD: undefined });
     errors.mock.resetCalls();
-    const { submitTicketAction, afterCallbacks, messages } = loadAction({ failedRecipient: SUBMITTER });
+    const { submitTicketAction, afterCallbacks, messages } = loadAction();
 
     assert.deepEqual(await submitTicketAction(createValidFormData()), { success: true, ticketNumber: TICKET_NUMBER });
     assert.equal(afterCallbacks.length, 1);
     await afterCallbacks[0]();
-    assert.deepEqual(messages.map((message) => message.to), [SUBMITTER, SHARED_MAILBOX]);
-    assert.deepEqual(errors.mock.calls.map((call) => call.arguments), [["Failed to send ticket submission confirmation."]]);
+    assert.deepEqual(messages, []);
+    assert.deepEqual(errors.mock.calls.map((call) => call.arguments), [
+      ["Failed to send ticket submission confirmation.", "GMAIL_USER or GMAIL_APP_PASSWORD is missing"],
+      ["Failed to send new ticket admin alert.", "GMAIL_USER or GMAIL_APP_PASSWORD is missing"],
+    ]);
   });
 });
 
