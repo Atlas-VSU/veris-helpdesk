@@ -263,6 +263,19 @@ export type Database = {
         }
         Returns: Json
       }
+      get_admin_dashboard_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          closed_count: number
+          in_progress_count: number
+          new_count: number
+          open_count: number
+          resolved_count: number
+          total_tickets: number
+          urgent_tickets: number
+          waiting_for_client_count: number
+        }[]
+      }
     }
     Enums: {
       message_sender: "client" | "admin"
