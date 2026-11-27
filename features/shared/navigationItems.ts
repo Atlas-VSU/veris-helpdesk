@@ -1,4 +1,4 @@
-import { House, TicketPlus, Tickets } from "lucide-react";
+import { CircleHelp, House, TicketPlus, Tickets } from "lucide-react";
 
 import type { NavigationItem } from "@/features/shared/types";
 
@@ -17,10 +17,16 @@ export const navigationItems: NavigationItem[] = [
       pathname === "/verify" || pathname.startsWith("/tickets"),
   },
   {
-    href: "/submit-ticket",
-    label: "Submit a Ticket",
-    icon: TicketPlus,
-    primary: true,
-    isCurrent: (pathname) => pathname === "/submit-ticket",
+    href: "/faq",
+    label: "FAQ",
+    icon: CircleHelp,
+    isCurrent: (pathname) => pathname === "/faq",
   },
 ];
+
+export const primaryNavAction: NavigationItem = {
+  href: "/submit-ticket",
+  label: "Submit Ticket",
+  icon: TicketPlus,
+  isCurrent: (pathname) => pathname === "/submit-ticket",
+};
