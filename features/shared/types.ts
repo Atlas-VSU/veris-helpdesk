@@ -5,5 +5,6 @@ export type NavigationItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  primary?: boolean;
   isCurrent: (pathname: string) => boolean;
 };
