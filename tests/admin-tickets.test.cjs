@@ -107,21 +107,15 @@ test("admin ticket API contract and database requests", async (t) => {
     const detail = { ...ticket, messages: [message], attachments: [
       file, { ...file, id: "3e2f70f2-be91-4f09-8281-f06d24922e9c", message_id: message.id },
     ] };
-    api.reply.body = [detail];
+    api.reply.body = detail;
     const response = await api.getDetail(detailRequest(), context());
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Cache-Control"), "private, no-store");
     assert.deepEqual(await response.json(), { data: detail });
     assert.equal(api.calls.length, 1);
     const [call] = api.calls;
-    assert.equal(call.method, "GET");
-    assert.equal(call.url.pathname, "/rest/v1/tickets");
-    const params = call.url.searchParams;
-    assert.equal(params.get("ticket_number"), `eq.${ticket.ticket_number}`);
-    assert.equal(params.has("email"), false);
-    assert.equal(params.get("messages.order"), "created_at.asc,id.asc");
-    assert.equal(params.get("select"), Object.keys(ticket).join(",") +
-      ",messages(id,sender_type,body,created_at),attachments(id,message_id,file_name,file_type,file_size)");
+    assert.equal(call.url.pathname, "/rest/v1/rpc/get_admin_ticket_detail");
+    assert.deepEqual(JSON.parse(call.body), { p_ticket_number: ticket.ticket_number });
   });
 
   await t.test("detail distinguishes invalid numbers, missing tickets and tickets without replies", async () => {
@@ -131,34 +125,47 @@ test("admin ticket API contract and database requests", async (t) => {
     assert.deepEqual(await invalid.json(), { error: "Invalid ticket number" });
     assert.equal(api.calls.length, 0);
 
-    api.reply.body = [];
+    api.reply.body = null;
     const missing = await api.getDetail(detailRequest(), context());
     assert.equal(missing.status, 404);
     assert.deepEqual(await missing.json(), { error: "Ticket not found" });
 
     const detail = { ...ticket, messages: [], attachments: [] };
-    api.reply.body = [detail];
+    api.reply.body = detail;
     const empty = await api.getDetail(detailRequest(), context());
     assert.equal(empty.status, 200);
     assert.deepEqual(await empty.json(), { data: detail });
   });
 
-  await t.test("detail reads beyond the database row limit on either embedded relation", async () => {
-    for (const relation of ["messages", "attachments"]) {
-      const api = setup();
-      const rows = Array.from({ length: 1001 }, (_, i) => ({ id: String(i) }));
-      const thread = { messages: [], attachments: [], [relation]: rows };
-      api.reply.body = ({ url }) => {
-        const offset = Number(url.searchParams.get(`${relation}.offset`));
-        const limit = Number(url.searchParams.get(`${relation}.limit`));
-        assert.equal(url.searchParams.get(`${relation}.order`), "created_at.asc,id.asc");
-        return [{ ...ticket, ...thread, [relation]: rows.slice(offset, offset + limit) }];
-      };
+  await t.test("a backdated reply becoming visible during a long read appears only on the next GET", async () => {
+    const api = setup();
+    const messages = Array.from({ length: 1001 }, (_, i) => ({ id: `message-${i}` }));
+    const attachments = messages.map(({ id }) => ({ id: `file-${id}`, message_id: id }));
+    const before = { ...ticket, messages, attachments };
+    const after = { ...before, messages: [{ id: "late" }, ...messages],
+      attachments: [{ id: "late-file", message_id: "late" }, ...attachments] };
+
+    let visible = before;
+    api.reply.body = ({ url }) => {
+      const snapshot = visible;
+      visible = after; // Another transaction commits before the next database request.
+      // Model the old offset reads too: page two would repeat message-999.
+      if (url.pathname === "/rest/v1/tickets") {
+        const page = (relation) => {
+          const start = Number(url.searchParams.get(`${relation}.offset`));
+          const size = Number(url.searchParams.get(`${relation}.limit`));
+          return snapshot[relation].slice(start, start + size);
+        };
+        return [{ ...ticket, messages: page("messages"), attachments: page("attachments") }];
+      }
+      return snapshot;
+    };
+    for (const expected of [before, after]) {
       const response = await api.getDetail(detailRequest(), context());
       assert.equal(response.status, 200);
-      assert.deepEqual(await response.json(), { data: { ...ticket, ...thread } });
-      assert.equal(api.calls.length, 2);
+      assert.deepEqual(await response.json(), { data: expected });
     }
+    assert.equal(api.calls.length, 2, "each HTTP read must use one database snapshot");
   });
 
   await t.test("list uses contract defaults, exact count, and stable newest-first ordering", async () => {
@@ -244,13 +251,15 @@ test("admin ticket API contract and database requests", async (t) => {
     const api = setup();
     let stored = { ...ticket };
     api.reply.body = (call) => {
-      assert.equal(call.url.pathname, "/rest/v1/tickets");
-      assert.equal(call.url.searchParams.get("ticket_number"), `eq.${ticket.ticket_number}`);
-      if (call.method === "PATCH") {
+      if (call.url.pathname === "/rest/v1/tickets") {
+        assert.equal(call.method, "PATCH");
+        assert.equal(call.url.searchParams.get("ticket_number"), `eq.${ticket.ticket_number}`);
         stored = { ...stored, ...JSON.parse(call.body) };
         return [stored];
       }
-      return [{ ...stored, messages: [], attachments: [] }];
+      assert.equal(call.url.pathname, "/rest/v1/rpc/get_admin_ticket_detail");
+      assert.deepEqual(JSON.parse(call.body), { p_ticket_number: ticket.ticket_number });
+      return { ...stored, messages: [], attachments: [] };
     };
 
     let expected = { ...ticket };

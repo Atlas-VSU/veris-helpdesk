@@ -243,7 +243,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_admin_ticket_detail: {
+        Args: { p_ticket_number: string }
+        Returns: Json
+      }
     }
     Enums: {
       message_sender: "client" | "admin"
