@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { LogIn, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,12 +59,14 @@ export default function MobileDrawer() {
                         onClick={() => setIsOpen(false)}
                         className={cn(
                           "group relative flex items-center gap-3.5 overflow-hidden rounded-xl px-4 py-3 text-sm font-medium transition-all active:scale-98",
-                          current
-                            ? "bg-[var(--palette-moss)]/10 font-semibold text-[var(--palette-moss)]"
-                            : "text-[var(--palette-charcoal-olive)] hover:bg-[var(--palette-sand)]",
+                          item.primary
+                            ? "mt-1 bg-primary text-primary-foreground hover:bg-[var(--palette-dark-olive)]"
+                            : current
+                              ? "bg-primary/10 font-semibold text-primary"
+                              : "text-[var(--palette-charcoal-olive)] hover:bg-[var(--palette-sand)]",
                         )}
                       >
-                        {current && (
+                        {current && !item.primary && (
                           <span
                             aria-hidden="true"
                             className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-r-full"
@@ -75,9 +77,8 @@ export default function MobileDrawer() {
                           aria-hidden="true"
                           className={cn(
                             "h-4 w-4 transition-colors",
-                            current
-                              ? "text-[var(--palette-moss)]"
-                              : "text-[var(--palette-dark-olive)] group-hover:text-[var(--palette-moss)]",
+                            !current && !item.primary &&
+                              "text-[var(--palette-dark-olive)] group-hover:text-primary",
                           )}
                         />
                         {item.label}
@@ -86,19 +87,6 @@ export default function MobileDrawer() {
                   })}
                 </nav>
                 </div>
-
-              <div className="mt-6 border-t border-[var(--palette-stone)] pt-4">
-                <div className="mx-auto w-[calc(100%-1.5rem)] max-w-[16rem]">
-                  <Link
-                    href="/admin/login"
-                    onClick={() => setIsOpen(false)}
-                    className="flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-[var(--palette-terracotta)] px-5 text-sm font-semibold text-[var(--palette-charcoal-olive)] shadow-[0_12px_28px_rgba(193,140,93,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--palette-terracotta)]/90 active:translate-y-0"
-                  >
-                    <LogIn aria-hidden="true" className="h-4 w-4" />
-                    Admin Login
-                  </Link>
-                </div>
-              </div>
             </DrawerContent>
           </Drawer>
         </div>
