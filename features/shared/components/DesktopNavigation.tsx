@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogIn } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { navigationItems } from "../navigationItems";
@@ -59,20 +58,6 @@ export default function DesktopNavigation() {
             );
           })}
         </nav>
-
-        <div className="hidden items-center sm:flex">
-          <Link
-            href="/admin/login"
-            className="group flex items-center gap-2 rounded-full bg-[var(--palette-terracotta)] px-6 py-3 text-xs font-semibold text-[var(--palette-charcoal-olive)] shadow-soft transition-all duration-300 hover:bg-[var(--palette-terracotta)]/90 hover:scale-[1.06] hover:shadow-float active:scale-95"
-          >
-            <LogIn
-              aria-hidden="true"
-              className="size-3.5 md:size-4"
-              strokeWidth={1.75}
-            />
-            Admin Login
-          </Link>
-        </div>
     </>
         
   )

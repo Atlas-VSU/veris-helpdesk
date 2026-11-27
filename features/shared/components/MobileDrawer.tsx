@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { LogIn, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -86,19 +86,6 @@ export default function MobileDrawer() {
                   })}
                 </nav>
                 </div>
-
-              <div className="mt-6 border-t border-[var(--palette-stone)] pt-4">
-                <div className="mx-auto w-[calc(100%-1.5rem)] max-w-[16rem]">
-                  <Link
-                    href="/admin/login"
-                    onClick={() => setIsOpen(false)}
-                    className="flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-[var(--palette-terracotta)] px-5 text-sm font-semibold text-[var(--palette-charcoal-olive)] shadow-[0_12px_28px_rgba(193,140,93,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--palette-terracotta)]/90 active:translate-y-0"
-                  >
-                    <LogIn aria-hidden="true" className="h-4 w-4" />
-                    Admin Login
-                  </Link>
-                </div>
-              </div>
             </DrawerContent>
           </Drawer>
         </div>
