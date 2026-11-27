@@ -47,10 +47,14 @@ export default function DesktopNavigation() {
                 href={item.href}
                 aria-current={current ? "page" : undefined}
                 className={cn(
-                  "relative rounded-full px-2 py-2 whitespace-nowrap font-sans text-xs transition-all duration-normal md:px-3 lg:px-4 lg:text-sm",
-                  current
-                    ? "bg-[var(--palette-moss)]/10 font-semibold text-[var(--palette-moss)]"
-                    : "text-[var(--palette-dark-olive)] hover:bg-[var(--palette-sand)] hover:text-[var(--palette-moss)]",
+                  "relative rounded-full py-2 whitespace-nowrap font-sans text-xs transition-all duration-normal lg:text-sm",
+                  item.primary
+                    ? "ml-1 bg-primary px-4 text-primary-foreground hover:bg-[var(--palette-dark-olive)] lg:px-5"
+                    : "px-2 md:px-3 lg:px-4",
+                  !item.primary &&
+                    (current
+                      ? "bg-primary/10 font-semibold text-primary"
+                      : "text-[var(--palette-dark-olive)] hover:bg-[var(--palette-sand)] hover:text-primary"),
                 )}
               >
                 {item.label}

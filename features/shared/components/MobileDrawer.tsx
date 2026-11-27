@@ -59,12 +59,14 @@ export default function MobileDrawer() {
                         onClick={() => setIsOpen(false)}
                         className={cn(
                           "group relative flex items-center gap-3.5 overflow-hidden rounded-xl px-4 py-3 text-sm font-medium transition-all active:scale-98",
-                          current
-                            ? "bg-[var(--palette-moss)]/10 font-semibold text-[var(--palette-moss)]"
-                            : "text-[var(--palette-charcoal-olive)] hover:bg-[var(--palette-sand)]",
+                          item.primary
+                            ? "mt-1 bg-primary text-primary-foreground hover:bg-[var(--palette-dark-olive)]"
+                            : current
+                              ? "bg-primary/10 font-semibold text-primary"
+                              : "text-[var(--palette-charcoal-olive)] hover:bg-[var(--palette-sand)]",
                         )}
                       >
-                        {current && (
+                        {current && !item.primary && (
                           <span
                             aria-hidden="true"
                             className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-r-full"
@@ -75,9 +77,8 @@ export default function MobileDrawer() {
                           aria-hidden="true"
                           className={cn(
                             "h-4 w-4 transition-colors",
-                            current
-                              ? "text-[var(--palette-moss)]"
-                              : "text-[var(--palette-dark-olive)] group-hover:text-[var(--palette-moss)]",
+                            !current && !item.primary &&
+                              "text-[var(--palette-dark-olive)] group-hover:text-primary",
                           )}
                         />
                         {item.label}
