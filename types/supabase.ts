@@ -276,6 +276,10 @@ export type Database = {
           waiting_for_client_count: number
         }[]
       }
+      get_admin_ticket_detail: {
+        Args: { p_ticket_number: string }
+        Returns: Json
+      }
     }
     Enums: {
       message_sender: "client" | "admin"

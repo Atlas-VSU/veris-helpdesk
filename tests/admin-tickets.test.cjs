@@ -32,8 +32,10 @@ test("admin ticket API contract and database requests", async (t) => {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       global: {
         fetch: async (url, options) => {
-          calls.push({ url: new URL(url), method: options.method, body: options.body, headers: new Headers(options.headers) });
-          return new Response(JSON.stringify(reply.body), {
+          const call = { url: new URL(url), method: options.method, body: options.body, headers: new Headers(options.headers) };
+          calls.push(call);
+          const body = typeof reply.body === "function" ? reply.body(call) : reply.body;
+          return new Response(JSON.stringify(body), {
             status: reply.status,
             headers: { "Content-Type": "application/json", "Content-Range": `0-0/${reply.total}` },
           });
@@ -41,6 +43,7 @@ test("admin ticket API contract and database requests", async (t) => {
       },
     });
     const mocks = {
+      "server-only": {},
       "next/headers": {
         cookies: async () => new NextRequest("https://helpdesk.example", {
           headers: token ? { cookie: `${cookieName}=${token}` } : {},
@@ -48,9 +51,11 @@ test("admin ticket API contract and database requests", async (t) => {
       },
       "@/lib/supabase-server": { getSupabaseServerClient: () => client },
     };
+    const detail = loadTs("app/api/admin/tickets/[ticketNumber]/route.ts", mocks);
     return {
-      ...loadTs("app/api/admin/tickets/route.ts", mocks),
-      ...loadTs("app/api/admin/tickets/[ticketNumber]/route.ts", mocks),
+      GET: loadTs("app/api/admin/tickets/route.ts", mocks).GET,
+      getDetail: detail.GET,
+      PATCH: detail.PATCH,
       calls, reply,
     };
   }
@@ -59,6 +64,7 @@ test("admin ticket API contract and database requests", async (t) => {
     method: "PATCH", body: JSON.stringify(body),
   });
   const context = (ticketNumber = ticket.ticket_number) => ({ params: Promise.resolve({ ticketNumber }) });
+  const detailRequest = () => new Request(`https://helpdesk.example/api/admin/tickets/${ticket.ticket_number}`);
 
   await t.test("direct handler calls reject missing, invalid, expired, and client sessions", async () => {
     const tokens = [
@@ -73,6 +79,9 @@ test("admin ticket API contract and database requests", async (t) => {
       const list = await api.GET(listRequest("page=bad"));
       assert.equal(list.status, 401);
       assert.deepEqual(await list.json(), { error: "Unauthorized" });
+      const detail = await api.getDetail(detailRequest(), context("bad"));
+      assert.equal(detail.status, 401);
+      assert.deepEqual(await detail.json(), { error: "Unauthorized" });
       const patch = await api.PATCH(new Request("https://helpdesk.example", { method: "PATCH", body: "bad JSON" }), context("bad"));
       assert.equal(patch.status, 401);
       assert.deepEqual(await patch.json(), { error: "Unauthorized" });
@@ -80,8 +89,83 @@ test("admin ticket API contract and database requests", async (t) => {
     }
     const clientCookie = setup(adminToken, "client_session");
     assert.equal((await clientCookie.GET(listRequest())).status, 401);
+    assert.equal((await clientCookie.getDetail(detailRequest(), context())).status, 401);
     assert.equal((await clientCookie.PATCH(patchRequest({ status: "open" }), context())).status, 401);
     assert.equal(clientCookie.calls.length, 0);
+  });
+
+  await t.test("detail selects the chronological thread and associates files with their replies", async () => {
+    const api = setup();
+    const message = {
+      id: "565fa917-be6e-4ddd-a0c8-def4628aeb6e", sender_type: "admin",
+      body: "Refund attached.", created_at: "2026-10-02T00:00:00Z",
+    };
+    const file = {
+      id: "cf101adb-d35d-4052-a418-6c359189156a", message_id: null,
+      file_name: "statement.pdf", file_type: "application/pdf", file_size: 512,
+    };
+    const detail = { ...ticket, messages: [message], attachments: [
+      file, { ...file, id: "3e2f70f2-be91-4f09-8281-f06d24922e9c", message_id: message.id },
+    ] };
+    api.reply.body = detail;
+    const response = await api.getDetail(detailRequest(), context());
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+    assert.deepEqual(await response.json(), { data: detail });
+    assert.equal(api.calls.length, 1);
+    const [call] = api.calls;
+    assert.equal(call.url.pathname, "/rest/v1/rpc/get_admin_ticket_detail");
+    assert.deepEqual(JSON.parse(call.body), { p_ticket_number: ticket.ticket_number });
+  });
+
+  await t.test("detail distinguishes invalid numbers, missing tickets and tickets without replies", async () => {
+    const api = setup();
+    const invalid = await api.getDetail(detailRequest(), context("TCK-26-00001"));
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { error: "Invalid ticket number" });
+    assert.equal(api.calls.length, 0);
+
+    api.reply.body = null;
+    const missing = await api.getDetail(detailRequest(), context());
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await missing.json(), { error: "Ticket not found" });
+
+    const detail = { ...ticket, messages: [], attachments: [] };
+    api.reply.body = detail;
+    const empty = await api.getDetail(detailRequest(), context());
+    assert.equal(empty.status, 200);
+    assert.deepEqual(await empty.json(), { data: detail });
+  });
+
+  await t.test("a backdated reply becoming visible during a long read appears only on the next GET", async () => {
+    const api = setup();
+    const messages = Array.from({ length: 1001 }, (_, i) => ({ id: `message-${i}` }));
+    const attachments = messages.map(({ id }) => ({ id: `file-${id}`, message_id: id }));
+    const before = { ...ticket, messages, attachments };
+    const after = { ...before, messages: [{ id: "late" }, ...messages],
+      attachments: [{ id: "late-file", message_id: "late" }, ...attachments] };
+
+    let visible = before;
+    api.reply.body = ({ url }) => {
+      const snapshot = visible;
+      visible = after; // Another transaction commits before the next database request.
+      // Model the old offset reads too: page two would repeat message-999.
+      if (url.pathname === "/rest/v1/tickets") {
+        const page = (relation) => {
+          const start = Number(url.searchParams.get(`${relation}.offset`));
+          const size = Number(url.searchParams.get(`${relation}.limit`));
+          return snapshot[relation].slice(start, start + size);
+        };
+        return [{ ...ticket, messages: page("messages"), attachments: page("attachments") }];
+      }
+      return snapshot;
+    };
+    for (const expected of [before, after]) {
+      const response = await api.getDetail(detailRequest(), context());
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { data: expected });
+    }
+    assert.equal(api.calls.length, 2, "each HTTP read must use one database snapshot");
   });
 
   await t.test("list uses contract defaults, exact count, and stable newest-first ordering", async () => {
@@ -163,6 +247,54 @@ test("admin ticket API contract and database requests", async (t) => {
     }
   });
 
+  await t.test("PATCH changes can be read back from detail, including close and reopen", async () => {
+    const api = setup();
+    let stored = { ...ticket };
+    api.reply.body = (call) => {
+      if (call.url.pathname === "/rest/v1/tickets") {
+        assert.equal(call.method, "PATCH");
+        assert.equal(call.url.searchParams.get("ticket_number"), `eq.${ticket.ticket_number}`);
+        stored = { ...stored, ...JSON.parse(call.body) };
+        return [stored];
+      }
+      assert.equal(call.url.pathname, "/rest/v1/rpc/get_admin_ticket_detail");
+      assert.deepEqual(JSON.parse(call.body), { p_ticket_number: ticket.ticket_number });
+      return { ...stored, messages: [], attachments: [] };
+    };
+
+    let expected = { ...ticket };
+    for (const change of [
+      { priority: "urgent" }, // Preserve the legacy service until an admin changes it.
+      { service: "Billing" },
+      { service: "Technical Support", status: "waiting_for_client", priority: "low" },
+      { service: "General Inquiry" },
+      { status: "closed" },
+      { status: "open" },
+    ]) {
+      expected = { ...expected, ...change };
+      const updated = await api.PATCH(patchRequest(change), context());
+      assert.equal(updated.status, 200);
+      assert.deepEqual(await updated.json(), { data: expected });
+
+      const detail = await api.getDetail(detailRequest(), context());
+      assert.equal(detail.status, 200);
+      assert.deepEqual(await detail.json(), { data: { ...expected, messages: [], attachments: [] } });
+    }
+  });
+
+  await t.test("PATCH rejects an unknown category, including when another field is valid", async () => {
+    const api = setup();
+    for (const change of [
+      { service: "Internet" }, { service: null }, { service: "" },
+      { status: "closed", service: "billing" }, { category: "Billing" },
+    ]) {
+      const response = await api.PATCH(patchRequest(change), context());
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { error: "Invalid ticket update" });
+    }
+    assert.equal(api.calls.length, 0);
+  });
+
   await t.test("PATCH rejects invalid JSON, ticket numbers, empty and unauthorized fields", async () => {
     const api = setup();
     for (const body of [{}, [], null, { status: "bad" }, { priority: "bad" }, { status: null }, { priority: null }, { email: "attacker@example.com" }, { status: "open", subject: "changed" }]) {
@@ -187,7 +319,7 @@ test("admin ticket API contract and database requests", async (t) => {
     const api = setup();
     api.reply.status = 500;
     api.reply.body = { code: "XX000", message: "Private database details" };
-    for (const response of [await api.GET(listRequest()), await api.PATCH(patchRequest({ status: "open" }), context())]) {
+    for (const response of [await api.GET(listRequest()), await api.getDetail(detailRequest(), context()), await api.PATCH(patchRequest({ status: "open" }), context())]) {
       assert.equal(response.status, 500);
       const body = await response.json();
       assert.equal(typeof body.error, "string");

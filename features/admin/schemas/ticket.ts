@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { priorityEnum } from "@/features/tickets/schemas/ticket";
+import { SERVICE_OPTIONS } from "@/features/tickets/service-options";
 
 const statusEnum = z.enum([
   "new", "open", "in_progress", "waiting_for_client", "resolved", "closed",
@@ -20,6 +21,7 @@ export const adminTicketsQuerySchema = z.object({
 export const adminTicketUpdateSchema = z.object({
   status: statusEnum.optional(),
   priority: priorityEnum.optional(),
-}).strict().refine((value) => value.status !== undefined || value.priority !== undefined, {
-  message: "Provide status or priority",
+  service: z.enum(SERVICE_OPTIONS).optional(),
+}).strict().refine((value) => Object.values(value).some((field) => field !== undefined), {
+  message: "Provide status, priority, or service",
 });
