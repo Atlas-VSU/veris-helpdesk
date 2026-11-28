@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
 
   // Only apply rate limiting to API ticket submissions (POST requests).
   // Server Action submissions on /submit-ticket are rate-limited inside submitTicketAction.
-  if (request.nextUrl.pathname.startsWith("/api/tickets")) {
+  if (pathname === "/api/tickets" || pathname === "/api/tickets/") {
     if (request.method === "POST") {
       const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
 

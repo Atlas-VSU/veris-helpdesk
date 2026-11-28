@@ -234,6 +234,20 @@ test("FS-09 admin reply attachment validation, atomic persistence, and failure r
     };
   }
 
+  await t.test("a close or deletion during upload removes the file and returns the ticket error", async () => {
+    for (const [code, status] of [["VR400", 400], ["VR404", 404]]) {
+      const ctx = setup({ metadataError: { code } });
+      await assert.rejects(ctx.persistAdminReplyWithAttachment({
+        ticketId: TICKET_ID, adminId: ADMIN_ID, body: "Reply",
+        file: new File([PDF_BYTES], "reply.pdf", { type: "application/pdf" }),
+      }), (error) => error.status === status);
+      assert.deepEqual(ctx.operations.map(({ type }) => type), ["upload", "rpc_create_admin_reply_with_attachment", "remove"]);
+      assert.deepEqual(ctx.uploadedObjects, []);
+      assert.deepEqual(ctx.savedMessages, []);
+      assert.deepEqual(ctx.savedAttachments, []);
+    }
+  });
+
   await t.test("uploads file first, then atomically saves the reply and attachment metadata", async () => {
     const validFiles = [
       new File([JPEG_BYTES], "receipt photo.jpg", { type: "image/jpeg" }),

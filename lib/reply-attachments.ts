@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { replyBodySchema } from "@/features/tickets/schemas/reply";
 import {
   hasAcceptedAttachmentSignature,
   validateAttachmentFile,
@@ -9,12 +10,6 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { SavedAdminReply, ThreadAttachment } from "@/types/database";
 
 export const ATTACHMENTS_BUCKET = "attachments";
-
-const replyBodySchema = z
-  .string()
-  .trim()
-  .min(1, "Reply must contain 1 to 5,000 characters after trimming.")
-  .max(5000, "Reply must contain 1 to 5,000 characters after trimming.");
 
 const existingReplyAttachmentTargetSchema = z.object({
   ticketId: z.string().uuid("Invalid ticket ID").optional(),
@@ -353,6 +348,16 @@ export async function persistAdminReplyWithAttachment({
   );
 
   const result = rawResult as AtomicReplyRpcResult | null;
+
+  // The locked ticket check rejected this transaction, so the upload is orphaned.
+  if (txError?.code === "VR400" || txError?.code === "VR404") {
+    if (storagePath) {
+      const { error } = await supabase.storage.from(ATTACHMENTS_BUCKET).remove([storagePath]);
+      if (error) console.error("Error removing rejected reply attachment.");
+    }
+    if (txError.code === "VR404") throw ApiError.notFound("Ticket not found");
+    throw ApiError.badRequest("Ticket is closed.");
+  }
 
   if (txError || !result || (file && (!result.attachments || result.attachments.length === 0))) {
     const lookup = await lookupSavedReplyWithAttachment(supabase, {
