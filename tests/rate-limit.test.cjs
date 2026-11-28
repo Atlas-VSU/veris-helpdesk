@@ -104,6 +104,7 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
       ["ratelimit:ticket", { limit: 5, window: "1 h" }],
       ["ratelimit:otp:request", { limit: 5, window: "5 m" }],
       ["ratelimit:otp:verify", { limit: 10, window: "5 m" }],
+      ["ratelimit:client-reply", { limit: 10, window: "5 m" }],
     ]);
     assert.equal(api.constructors[0].redis, api.constructors[2].redis);
     assert.deepEqual(api.constructors[0].redis.options, { url: "https://redis.example", token: "test-token" });
@@ -267,6 +268,13 @@ test("authentication rate limiting and Upstash configuration", async (t) => {
   await t.test("proxy does not duplicate rate limiting for /submit-ticket Server Actions", async () => {
     const api = setup({ response: { ...healthy, success: false, remaining: 0 } });
     const response = await api.proxy(request("/submit-ticket", "POST"));
+    assert.equal(response.headers.get("x-middleware-next"), "1");
+    assert.equal(api.calls.length, 0);
+  });
+
+  await t.test("client replies do not consume the ticket submission quota", async () => {
+    const api = setup();
+    const response = await api.proxy(request("/api/tickets/TCK-2026-00001/messages"));
     assert.equal(response.headers.get("x-middleware-next"), "1");
     assert.equal(api.calls.length, 0);
   });

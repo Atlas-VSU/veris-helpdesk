@@ -192,7 +192,7 @@ paths:
       summary: Reply to a ticket as its verified owner
       operationId: createClientTicketMessage
       description: >
-        Planned operation. Requires client_session for the verified owner.
+        Requires client_session for the verified owner.
         Ticket ownership is checked against the session email case-insensitively.
         The reply quota is 10 requests per five minutes per verified email,
         across tickets and independent of other quotas. After saving the reply,
@@ -479,7 +479,7 @@ paths:
         Requires admin_session. Change the ticket's category through `service`.
         Set `status` to `closed` to close a ticket or to `open` to reopen it.
         For the Request info action, set `status` to `waiting_for_client`.
-        Explanatory messages use the separately planned
+        Explanatory messages use
         `POST /api/admin/tickets/{ticketNumber}/messages`.
       security:
         - adminSession: []
@@ -544,7 +544,7 @@ paths:
       summary: Reply to a ticket as an administrator
       operationId: adminCreateTicketMessage
       description: >
-        Planned operation. Requires admin_session. If file storage or attachment
+        Requires admin_session. If file storage or attachment
         metadata persistence fails, return 500, roll back the reply, and clean
         up any partially saved attachment data. Email the client only after the
         reply and any attachment are saved. Log email delivery failures and

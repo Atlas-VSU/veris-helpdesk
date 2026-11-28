@@ -48,7 +48,15 @@ export const otpVerifyRateLimit = redis
     })
   : null;
 
-// Login and OTP must never proceed without a successful Redis check in production.
+export const clientReplyRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, "5 m"),
+      prefix: "ratelimit:client-reply",
+    })
+  : null;
+
+// Session-based quotas require a successful Redis check in production.
 export async function checkAuthRateLimit(
   limiter: Pick<Ratelimit, "limit"> | null,
   identifier: string,
