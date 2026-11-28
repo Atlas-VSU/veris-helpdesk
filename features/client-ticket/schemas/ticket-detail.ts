@@ -13,12 +13,15 @@ const ticketPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 const ticketUserTypeSchema = z.enum(["subscriber", "student"]);
 
 const ticketMessageSchema = z.object({
+  id: z.string().uuid().optional(),
   sender_type: z.enum(["client", "admin"]),
   body: z.string(),
   created_at: z.string().datetime({ offset: true }),
 });
 
 const ticketAttachmentSchema = z.object({
+  id: z.string().uuid().optional(),
+  message_id: z.string().uuid().nullable().optional(),
   file_name: z.string(),
   file_type: z.string(),
   file_size: z.number().int().nonnegative(),

@@ -263,6 +263,10 @@ export type Database = {
         }
         Returns: Json
       }
+      create_client_ticket_reply: {
+        Args: { p_body: string; p_email: string; p_ticket_number: string }
+        Returns: { body: string; created_at: string; id: string; ticket_id: string }[]
+      }
       get_admin_dashboard_counts: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -278,6 +282,10 @@ export type Database = {
       }
       get_admin_ticket_detail: {
         Args: { p_ticket_number: string }
+        Returns: Json
+      }
+      get_client_ticket_detail: {
+        Args: { p_ticket_number: string; p_email: string }
         Returns: Json
       }
     }
